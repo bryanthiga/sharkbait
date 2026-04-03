@@ -1,0 +1,62 @@
+# Sharkbait — Cursor Rules
+
+## What Is This App
+Sharkbait is a shark sighting tracker that monitors and displays shark sightings from around the world. The user (Bryant) is non-technical — explain everything in plain English and make changes directly rather than giving instructions.
+
+## How To Help Bryant
+
+### Communication Style
+- Bryant doesn't code. Don't explain code internals unless asked.
+- Just make the changes and say what you did in 1-2 sentences.
+- If something is broken, fix it. Don't ask "should I fix this?" — just fix it.
+- If a task is ambiguous, pick the best approach and do it. Ask only if there are genuinely different directions.
+
+### When Bryant Says...
+- "make it look better" → Improve spacing, typography, colors, animations. Use modern UI patterns.
+- "add more news" / "more data" → Add new shark sighting data sources, RSS feeds, or API integrations.
+- "it's broken" → Check the terminal for errors, check the browser console, fix the root cause.
+- "push it" / "save it" → Run `bash scripts/save.sh` to commit and push.
+- "deploy it" → Help deploy to Vercel/Netlify/wherever the app is hosted.
+
+### Code Standards
+- Mobile-first responsive design. Most users will check shark sightings on their phone.
+- Clean, modern UI. Think: Apple Maps meets surf report apps.
+- Prefer Tailwind CSS or whatever styling the app already uses.
+- Keep it simple. No over-engineering. This is a focused single-purpose app.
+- Always test that the dev server still runs after making changes.
+
+### UI Guidelines
+- Dark/ocean theme preferred (deep blues, teals, white text)
+- Map should be the hero — big, interactive, front and center
+- Sighting cards should show: location, date, shark species, source, danger level
+- Mobile: bottom sheet pattern for sighting details
+- Desktop: sidebar + map layout
+- Loading states and empty states should look polished, not broken
+- Animations should be subtle and smooth (fade in sightings, pulse on new alerts)
+
+### Data Sources To Consider
+- Shark Research Committee (sharkresearchcommittee.com)
+- Global Shark Attack File (GSAF)
+- Dorsal (Australia shark tracking)
+- Ocearch shark tracker API
+- Local beach patrol Twitter/X feeds
+- NOAA fisheries data
+- News API for shark-related articles
+- Florida Museum International Shark Attack File
+
+## Scripts
+
+| Command | What it does |
+|---------|-------------|
+| `bash scripts/setup.sh` | First-time setup (install deps, init git) |
+| `bash scripts/dev.sh` | Start the dev server |
+| `bash scripts/save.sh` | Commit and push all changes |
+| `bash scripts/save.sh "added map"` | Commit with a message and push |
+| `bash scripts/push-github.sh` | First-time push to GitHub |
+| `bash scripts/new-feature.sh cool-thing` | Start a new feature branch |
+
+## DO NOT
+- Don't delete or overwrite data/sighting files without asking
+- Don't change the core data model without explaining why
+- Don't add heavy dependencies for simple tasks
+- Don't make the UI corporate/boring — this is a fun consumer app
