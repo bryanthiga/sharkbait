@@ -8,6 +8,7 @@ export interface Sighting {
   lat: number;
   lon: number;
   type: SightingType;
+  species: string;
   source: string;
   url: string;
 }

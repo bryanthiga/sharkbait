@@ -14,11 +14,11 @@ body {
   @apply min-h-dvh bg-ocean-950 text-slate-100 antialiased;
 }
 
-/* Subtle map grid texture */
-.map-placeholder {
-  background-color: #0c1929;
-  background-image:
-    linear-gradient(rgba(45, 212, 191, 0.06) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(45, 212, 191, 0.06) 1px, transparent 1px);
-  background-size: 48px 48px;
+/* Mapbox overrides */
+.mapboxgl-canvas {
+  outline: none;
+}
+.mapboxgl-popup-content {
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }

@@ -9,10 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "mapbox-gl": "^3.9.0",
+    "leaflet": "^1.9.4",
     "next": "^15.1.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
+  },
+  "overrides": {
+    "react-leaflet": {
+      "react": "$react",
+      "react-dom": "$react-dom"
+    }
   },
   "devDependencies": {
     "@types/node": "^22.10.0",

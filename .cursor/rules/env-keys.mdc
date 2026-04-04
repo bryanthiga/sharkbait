@@ -1,0 +1,12 @@
+---
+description: Always read API keys from .env.local — never hardcode or guess
+alwaysApply: true
+---
+
+# API Keys & Environment Variables
+
+- All API keys and secrets live in `.env.local` at the project root.
+- **Always** read `.env.local` to get current keys before using them.
+- **Never** hardcode keys, invent placeholder values, or ask the user to paste keys inline.
+- When adding a new key, add it to both `.env.local` and `.env.example` (without the real value).
+- After changing `.env.local`, remind the user to restart the dev server (`Ctrl+C` then `bash scripts/dev.sh`).

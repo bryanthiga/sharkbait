@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sharkbait — Shark sightings near you</title>
+  <meta name="theme-color" content="#020617">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Sharkbait">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #020617;
+      color: #f1f5f9;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    .app { display: flex; flex-direction: column; height: 100dvh; }
+    @media (min-width: 768px) { .app { flex-direction: row; } }
+
+    /* ── Map ───────────────────────────────────────── */
+    .map-wrap { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+    #map { width: 100%; height: 100%; }
+
+    .logo {
+      position: absolute; top: 14px; left: 14px; z-index: 5;
+      display: flex; align-items: center; gap: 10px;
+      background: rgba(2,6,23,0.75); backdrop-filter: blur(20px);
+      padding: 6px 18px 6px 6px; border-radius: 20px;
+      border: 1px solid rgba(45,212,191,0.2);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.5), 0 0 20px rgba(45,212,191,0.08);
+      cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease;
+    }
+    .logo:hover {
+      transform: scale(1.06);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(45,212,191,0.15);
+    }
+    .logo:active { transform: scale(0.96); }
+    .logo-shark {
+      width: 44px; height: 44px; border-radius: 14px; object-fit: cover;
+      animation: bob 3s ease-in-out infinite;
+      filter: drop-shadow(0 2px 6px rgba(45,212,191,0.3));
+    }
+    .logo-text { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 0.02em; }
+    .logo-text span {
+      background: linear-gradient(135deg, #5eead4 0%, #2dd4bf 50%, #14b8a6 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .logo-tagline {
+      font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
+      font-weight: 500; margin-top: -2px;
+    }
+
+    /* ── Loading ───────────────────────────────────── */
+    .loading-overlay {
+      position: absolute; inset: 0; z-index: 10;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: rgba(2,6,23,0.6); backdrop-filter: blur(4px);
+      pointer-events: none; transition: opacity 0.6s ease;
+    }
+    .loading-overlay.hidden { opacity: 0; pointer-events: none; }
+
+    .loading-shark-wrap {
+      width: 80px; height: 50px; position: relative;
+      animation: swimLoading 2s ease-in-out infinite;
+    }
+    .loading-shark-wrap svg { width: 100%; height: 100%; fill: #2dd4bf; filter: drop-shadow(0 0 12px rgba(45,212,191,0.5)); }
+    .loading-text { margin-top: 14px; font-size: 13px; color: #94a3b8; letter-spacing: 0.02em; }
+    .loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
+
+    @keyframes swimLoading {
+      0%, 100% { transform: translateX(-20px) rotate(-3deg); }
+      50% { transform: translateX(20px) rotate(3deg); }
+    }
+    @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
+
+    /* ── Resize Handle ─────────────────────────────── */
+    .resize-handle {
+      position: relative; z-index: 20;
+      background: rgba(45,212,191,0.06);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s;
+      flex-shrink: 0;
+      touch-action: none;
+    }
+    .resize-handle:hover, .resize-handle.active {
+      background: rgba(45,212,191,0.15);
+    }
+    .resize-handle .grip {
+      border-radius: 99px; background: rgba(45,212,191,0.4);
+      transition: background 0.2s, transform 0.2s;
+    }
+    .resize-handle:hover .grip, .resize-handle.active .grip {
+      background: #2dd4bf; transform: scale(1.2);
+    }
+
+    /* Mobile: horizontal bar at top of sidebar */
+    .resize-handle {
+      height: 14px; width: 100%; cursor: row-resize;
+      border-top: 1px solid rgba(45,212,191,0.1);
+    }
+    .resize-handle .grip {
+      width: 40px; height: 4px;
+    }
+
+    /* Desktop: vertical bar between map and sidebar */
+    @media (min-width: 768px) {
+      .resize-handle {
+        width: 8px; height: 100%; cursor: col-resize;
+        border-top: none; border-left: 1px solid rgba(45,212,191,0.1);
+        border-right: 1px solid rgba(45,212,191,0.1);
+      }
+      .resize-handle .grip {
+        width: 4px; height: 40px;
+      }
+    }
+
+    body.resizing { cursor: col-resize; user-select: none; }
+    body.resizing-v { cursor: row-resize; user-select: none; }
+    body.resizing .map-wrap, body.resizing .sidebar,
+    body.resizing-v .map-wrap, body.resizing-v .sidebar {
+      pointer-events: none;
+      transition: none;
+    }
+
+    /* ── Sidebar ───────────────────────────────────── */
+    .sidebar {
+      display: flex; flex-direction: column; max-height: 50dvh;
+      background: rgba(2,6,23,0.95); backdrop-filter: blur(20px);
+      overflow: hidden; min-height: 180px;
+    }
+    @media (min-width: 768px) {
+      .sidebar { max-height: none; width: 400px; min-width: 260px; max-width: 65vw; min-height: 0; }
+    }
+    .sidebar > .stats,
+    .sidebar > .species-section,
+    .sidebar > .filters,
+    .sidebar > .refresh-bar { flex-shrink: 0; }
+
+    /* ── Stats ─────────────────────────────────────── */
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 12px; }
+
+    .stat {
+      border-radius: 16px; padding: 10px 6px 8px; text-align: center;
+      position: relative; overflow: hidden; cursor: pointer;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s ease;
+      border: 1px solid var(--stat-glow, rgba(255,255,255,0.06));
+    }
+    .stat:hover {
+      transform: translateY(-4px) scale(1.04);
+      box-shadow: 0 8px 24px var(--stat-shadow, rgba(0,0,0,0.4));
+      border-color: var(--stat-glow, rgba(255,255,255,0.1));
+    }
+    .stat:active { transform: translateY(-1px) scale(0.97); }
+
+    /* Shimmer sweep */
+    .stat::after {
+      content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+      animation: shimmer 3s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .stat:nth-child(2)::after { animation-delay: 0.4s; }
+    .stat:nth-child(3)::after { animation-delay: 0.8s; }
+    .stat:nth-child(4)::after { animation-delay: 1.2s; }
+
+    .stat-icon {
+      font-size: 20px; line-height: 1;
+      margin-bottom: 2px;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      display: inline-block;
+    }
+    .stat:hover .stat-icon { transform: scale(1.3) rotate(-8deg); }
+
+    .stat-num {
+      font-size: 24px; font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(180deg, #fff 40%, var(--stat-color, #94a3b8));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 6px var(--stat-shadow, transparent));
+    }
+    .stat-label {
+      font-size: 8px; text-transform: uppercase; letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.45); margin-top: 1px; font-weight: 600;
+    }
+
+    /* Per-type theming */
+    .stat-total {
+      background: linear-gradient(145deg, #0a1628 0%, #155e75 100%);
+      --stat-color: #67e8f9; --stat-glow: rgba(34,211,238,0.2); --stat-shadow: rgba(34,211,238,0.15);
+    }
+    .stat-attack {
+      background: linear-gradient(145deg, #2a0a14 0%, #dc2626 100%);
+      --stat-color: #fca5a5; --stat-glow: rgba(239,68,68,0.25); --stat-shadow: rgba(239,68,68,0.2);
+    }
+    .stat-warning {
+      background: linear-gradient(145deg, #2a1500 0%, #d97706 100%);
+      --stat-color: #fde68a; --stat-glow: rgba(245,158,11,0.25); --stat-shadow: rgba(245,158,11,0.2);
+    }
+    .stat-sighting {
+      background: linear-gradient(145deg, #022c22 0%, #059669 100%);
+      --stat-color: #a7f3d0; --stat-glow: rgba(16,185,129,0.25); --stat-shadow: rgba(16,185,129,0.2);
+    }
+
+    @keyframes shimmer {
+      0% { left: -100%; }
+      50%, 100% { left: 150%; }
+    }
+
+    /* ── Species Bar ───────────────────────────────── */
+    .species-section {
+      padding: 4px 12px 8px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .species-header {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.35); margin-bottom: 6px; font-weight: 600;
+    }
+    .species-bar {
+      display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .species-bar::-webkit-scrollbar { display: none; }
+
+    .species-item {
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 68px; cursor: pointer;
+      padding: 6px 4px; border-radius: 14px;
+      transition: all 0.25s ease;
+      border: 1px solid transparent;
+      position: relative;
+    }
+    .species-item:hover { background: rgba(45,212,191,0.06); }
+    .species-item.active {
+      background: rgba(45,212,191,0.1);
+      border-color: rgba(45,212,191,0.25);
+      box-shadow: 0 0 20px rgba(45,212,191,0.1);
+    }
+
+    .species-icon {
+      width: 48px; height: 48px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 12px; overflow: hidden;
+      background: rgba(255,255,255,0.03);
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
+    }
+    .species-item.active .species-icon {
+      box-shadow: 0 0 16px rgba(45,212,191,0.3);
+      background: rgba(45,212,191,0.08);
+    }
+    .species-item:hover .species-icon { transform: scale(1.1); }
+    .species-icon img {
+      width: 100%; height: 100%; object-fit: cover; border-radius: 10px;
+      filter: grayscale(0.3) brightness(0.85);
+      transition: filter 0.25s;
+    }
+    .species-item.active .species-icon img,
+    .species-item:hover .species-icon img {
+      filter: grayscale(0) brightness(1);
+      animation: bob 2.5s ease-in-out infinite;
+    }
+    .species-icon svg { width: 100%; height: 100%; fill: currentColor; color: #64748b; }
+    .species-item.active .species-icon svg { color: #2dd4bf; animation: swim 2.5s ease-in-out infinite; }
+
+    .species-label {
+      font-size: 9px; color: #64748b; text-align: center;
+      white-space: nowrap; margin-top: 2px;
+      transition: color 0.25s;
+    }
+    .species-item.active .species-label { color: #5eead4; }
+
+    .species-count {
+      position: absolute; top: 2px; right: 4px;
+      font-size: 8px; font-weight: 700; color: #fff;
+      background: rgba(45,212,191,0.6); border-radius: 99px;
+      min-width: 16px; height: 14px;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0 4px;
+    }
+
+    /* ── Filters ───────────────────────────────────── */
+    .filters {
+      display: flex; gap: 6px; padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .filter-btn {
+      background: none; border: 1px solid transparent;
+      color: #64748b; font-size: 11px; font-weight: 500;
+      padding: 5px 12px; border-radius: 99px;
+      cursor: pointer; transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .filter-btn:hover { color: #cbd5e1; background: rgba(255,255,255,0.04); }
+    .filter-btn.active {
+      background: rgba(45,212,191,0.12); color: #5eead4;
+      border-color: rgba(45,212,191,0.25);
+      box-shadow: 0 0 12px rgba(45,212,191,0.08);
+    }
+
+    /* ── Feed ──────────────────────────────────────── */
+    .feed {
+      flex: 1; min-height: 0; overflow-y: auto; padding: 8px 10px;
+      -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    }
+    .feed::-webkit-scrollbar { width: 3px; }
+    .feed::-webkit-scrollbar-track { background: transparent; }
+    .feed::-webkit-scrollbar-thumb { background: rgba(45,212,191,0.15); border-radius: 4px; }
+
+    .card {
+      background: rgba(15,39,68,0.35);
+      border: 1px solid rgba(255,255,255,0.04);
+      border-radius: 14px; padding: 10px 12px; margin-bottom: 6px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      opacity: 0; animation: cardEnter 0.4s ease forwards;
+      position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%;
+      background: var(--card-accent, #3b82f6); border-radius: 3px 0 0 3px;
+      opacity: 0; transition: opacity 0.2s;
+    }
+    .card:hover { background: rgba(15,39,68,0.6); transform: translateX(4px); }
+    .card:hover::before { opacity: 1; }
+    .card.active {
+      background: rgba(22,78,99,0.5);
+      border-color: rgba(45,212,191,0.2);
+      transform: translateX(4px);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .card.active::before { opacity: 1; }
+
+    .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .card-title {
+      font-size: 13px; font-weight: 500; color: #e2e8f0; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .badge {
+      font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 3px 8px; border-radius: 99px; white-space: nowrap;
+      border: 1px solid; flex-shrink: 0;
+    }
+    .badge-attack { background: rgba(239,68,68,0.15); color: #fca5a5; border-color: rgba(239,68,68,0.3); }
+    .badge-warning { background: rgba(245,158,11,0.12); color: #fde68a; border-color: rgba(245,158,11,0.25); }
+    .badge-sighting { background: rgba(16,185,129,0.1); color: #a7f3d0; border-color: rgba(16,185,129,0.2); }
+    .badge-unknown { background: rgba(59,130,246,0.1); color: #bfdbfe; border-color: rgba(59,130,246,0.2); }
+
+    .card-species {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 10px; color: #5eead4; margin-top: 4px;
+      background: rgba(45,212,191,0.08); padding: 2px 8px 2px 3px;
+      border-radius: 99px; width: fit-content;
+    }
+    .card-species img { width: 20px; height: 20px; border-radius: 6px; object-fit: cover; }
+    .card-species svg { width: 18px; height: 12px; fill: currentColor; }
+
+    .card-location { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+    .card-meta {
+      font-size: 10px; color: #475569; margin-top: 5px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-meta a {
+      color: #2dd4bf; text-decoration: none; font-weight: 600;
+      transition: color 0.15s;
+    }
+    .card-meta a:hover { color: #5eead4; }
+
+    .refresh-bar { padding: 8px 12px; border-top: 1px solid rgba(255,255,255,0.06); }
+    .refresh-btn {
+      width: 100%; padding: 11px; border: none; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(13,148,136,0.6), rgba(6,95,70,0.6));
+      color: #fff; font-size: 12px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+      border: 1px solid rgba(45,212,191,0.15);
+    }
+    .refresh-btn:hover { background: linear-gradient(135deg, rgba(13,148,136,0.8), rgba(6,95,70,0.8)); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(13,148,136,0.2); }
+    .refresh-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .empty { padding: 60px 20px; text-align: center; font-size: 13px; color: #475569; }
+
+    /* ── Animations ────────────────────────────────── */
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    @keyframes swim {
+      0%, 100% { transform: translateX(0) scaleX(1) rotate(0deg); }
+      25% { transform: translateX(3px) scaleX(1) rotate(2deg); }
+      75% { transform: translateX(-3px) scaleX(1) rotate(-2deg); }
+    }
+    @keyframes cardEnter {
+      from { opacity: 0; transform: translateX(16px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 0.25; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="logo" onclick="map.flyTo({center:[-40,20],zoom:2,duration:1500})">
+        <img class="logo-shark" src="/shark-mascot.png" alt="Sharkbait mascot">
+        <div>
+          <div class="logo-text"><span>Sharkbait</span></div>
+          <div class="logo-tagline">Live shark tracker</div>
+        </div>
+      </div>
+      <div class="loading-overlay" id="loading">
+        <div class="loading-shark-wrap">
+          <svg viewBox="0 0 64 36"><path d="M4,20 C8,14 16,12 22,14 L26,6 L30,14 C38,10 52,14 58,18 L60,14 L58,20 L62,22 C48,28 24,26 14,23 C9,22 5,22 4,20Z"/><circle cx="18" cy="16" r="1.5" fill="#020617"/></svg>
+        </div>
+        <div class="loading-text">Scanning for shark sightings<span class="loading-dots"></span></div>
+      </div>
+    </div>
+
+    <div class="resize-handle" id="resize-handle"><div class="grip"></div></div>
+    <div class="sidebar" id="sidebar">
+      <div class="stats">
+        <div class="stat stat-total" data-filter="All"><div class="stat-icon">🦈</div><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total</div></div>
+        <div class="stat stat-attack" data-filter="Attack"><div class="stat-icon">🩸</div><div class="stat-num" id="stat-attack">0</div><div class="stat-label">Attacks</div></div>
+        <div class="stat stat-warning" data-filter="Warning"><div class="stat-icon">⚠️</div><div class="stat-num" id="stat-warning">0</div><div class="stat-label">Warnings</div></div>
+        <div class="stat stat-sighting" data-filter="Sighting"><div class="stat-icon">👁️</div><div class="stat-num" id="stat-sighting">0</div><div class="stat-label">Sightings</div></div>
+      </div>
+
+      <div class="species-section">
+        <div class="species-header">Species Spotted</div>
+        <div class="species-bar" id="species-bar"></div>
+      </div>
+
+      <div class="filters">
+        <button class="filter-btn active" data-filter="All">All</button>
+        <button class="filter-btn" data-filter="Attack">🔴 Attacks</button>
+        <button class="filter-btn" data-filter="Warning">🟠 Warnings</button>
+        <button class="filter-btn" data-filter="Sighting">🟢 Sightings</button>
+      </div>
+
+      <div class="feed" id="feed"></div>
+
+      <div class="refresh-bar">
+        <button class="refresh-btn" id="refresh-btn" disabled>Scanning…</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var TOKEN = "pk.eyJ1IjoiYnJ5YW50aGlnYSIsImEiOiJjbW5qaG1weGQwcTNkMnBwdXI1cTBkcTNhIn0.c96PKbqgeFGd_4NbW-w9PA";
+    var TYPE_COLORS = { Attack: "#ef4444", Warning: "#f59e0b", Sighting: "#10b981", Unknown: "#3b82f6" };
+
+    var allSightings = [];
+    var currentFilter = "All";
+    var currentSpecies = "All";
+    var selectedId = null;
+    var activePopup = null;
+    var mapLoaded = false;
+
+    // ── Shark 3D images by species ──────────────
+    var SHARK_IMAGES = {
+      "All": "/shark-mascot.png",
+      "Great White": "/shark-great-white.png",
+      "Tiger": "/shark-tiger.png",
+      "Hammerhead": "/shark-hammerhead.png",
+      "Bull": "/shark-bull.png",
+      "Mako": "/shark-mako.png",
+      "Whale Shark": "/shark-whale.png",
+      "Blacktip": "/shark-blacktip.png",
+      "Blue": "/shark-blue.png",
+      "Nurse": "/shark-nurse.png",
+      "Reef": "/shark-reef.png"
+    };
+
+    var SHARK_SVG_FALLBACK = '<svg viewBox="0 0 64 36"><path d="M4,20 C8,14 16,12 22,14 L26,6 L30,14 C38,10 52,14 58,18 L60,14 L58,20 L62,22 C48,28 24,26 14,23 C9,22 5,22 4,20Z" fill="currentColor"/><circle cx="18" cy="16" r="1.5" fill="#020617"/></svg>';
+
+    function getSharkIcon(species) {
+      var img = SHARK_IMAGES[species];
+      if (img) return '<img src="' + img + '" alt="' + species + '">';
+      return SHARK_SVG_FALLBACK;
+    }
+
+    // ── Map ──────────────────────────────────────
+    mapboxgl.accessToken = TOKEN;
+    var map = new mapboxgl.Map({
+      container: "map",
+      style: "mapbox://styles/mapbox/satellite-streets-v12",
+      center: [-40, 20],
+      zoom: 2,
+      projection: "globe"
+    });
+    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+
+    map.on("load", function() {
+      mapLoaded = true;
+
+      map.setFog({
+        color: "rgb(10, 20, 40)",
+        "high-color": "rgb(20, 40, 80)",
+        "horizon-blend": 0.08,
+        "space-color": "rgb(2, 6, 23)",
+        "star-intensity": 0.4
+      });
+
+      map.addSource("sightings", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
+      });
+
+      map.addLayer({
+        id: "sightings-glow",
+        type: "circle",
+        source: "sightings",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 8, 6, 16, 12, 26],
+          "circle-color": ["match", ["get", "type"], "Attack", "#ef4444", "Warning", "#f59e0b", "Sighting", "#10b981", "#3b82f6"],
+          "circle-opacity": 0.2,
+          "circle-blur": 1
+        }
+      });
+
+      map.addLayer({
+        id: "sightings-dots",
+        type: "circle",
+        source: "sightings",
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 5, 6, 8, 12, 14],
+          "circle-color": ["match", ["get", "type"], "Attack", "#ef4444", "Warning", "#f59e0b", "Sighting", "#10b981", "#3b82f6"],
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
+      map.on("click", "sightings-dots", function(e) {
+        if (e.features && e.features.length > 0) {
+          var props = e.features[0].properties;
+          selectSighting(props.id);
+          if (activePopup) { activePopup.remove(); }
+          var s = allSightings.find(function(s) { return s.id === props.id; });
+          if (s) {
+            var speciesHtml = s.species && s.species !== "Unknown"
+              ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:4px 0;">' + s.species + '</span>'
+              : '';
+            activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
+              .setLngLat([s.lon, s.lat])
+              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + s.title.substring(0, 80) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + s.location + ' &middot; ' + s.type + ' &middot; ' + s.source + '</p><a href="' + s.url + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
+              .addTo(map);
+          }
+        }
+      });
+
+      map.on("mouseenter", "sightings-dots", function() { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "sightings-dots", function() { map.getCanvas().style.cursor = ""; });
+      map.on("mouseenter", "sightings-glow", function() { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "sightings-glow", function() { map.getCanvas().style.cursor = ""; });
+
+      if (allSightings.length > 0) render();
+    });
+
+    // ── Helpers ──────────────────────────────────
+    function timeAgo(dateStr) {
+      var diff = Date.now() - new Date(dateStr).getTime();
+      var mins = Math.floor(diff / 60000);
+      if (mins < 60) return mins + "m ago";
+      var hrs = Math.floor(mins / 60);
+      if (hrs < 24) return hrs + "h ago";
+      return Math.floor(hrs / 24) + "d ago";
+    }
+
+    function getFiltered() {
+      var s = allSightings;
+      if (currentFilter !== "All") {
+        s = s.filter(function(x) { return x.type === currentFilter; });
+      }
+      if (currentSpecies !== "All") {
+        s = s.filter(function(x) { return x.species === currentSpecies; });
+      }
+      return s;
+    }
+
+    // ── Animated stat counter ────────────────────
+    function animateCount(el, target) {
+      var current = parseInt(el.textContent) || 0;
+      if (current === target) return;
+      var duration = 600;
+      var start = performance.now();
+      function step(ts) {
+        var progress = Math.min((ts - start) / duration, 1);
+        var eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = Math.round(current + (target - current) * eased);
+        if (progress < 1) requestAnimationFrame(step);
+      }
+      requestAnimationFrame(step);
+    }
+
+    function updateStats() {
+      var f = getFiltered();
+      animateCount(document.getElementById("stat-total"), f.length);
+      animateCount(document.getElementById("stat-attack"), f.filter(function(s) { return s.type === "Attack"; }).length);
+      animateCount(document.getElementById("stat-warning"), f.filter(function(s) { return s.type === "Warning"; }).length);
+      animateCount(document.getElementById("stat-sighting"), f.filter(function(s) { return s.type === "Sighting"; }).length);
+    }
+
+    // ── Species Bar ─────────────────────────────
+    function updateSpeciesBar() {
+      var bar = document.getElementById("species-bar");
+      var counts = {};
+      var filtered = currentFilter === "All"
+        ? allSightings
+        : allSightings.filter(function(s) { return s.type === currentFilter; });
+
+      filtered.forEach(function(s) {
+        var sp = s.species || "Unknown";
+        counts[sp] = (counts[sp] || 0) + 1;
+      });
+
+      var speciesList = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; });
+
+      var html = '<div class="species-item' + (currentSpecies === "All" ? " active" : "") + '" data-species="All">';
+      html += '<div class="species-icon">' + getSharkIcon("All") + '</div>';
+      html += '<div class="species-label">All</div>';
+      html += '<div class="species-count">' + filtered.length + '</div>';
+      html += '</div>';
+
+      for (var i = 0; i < speciesList.length; i++) {
+        var sp = speciesList[i];
+        html += '<div class="species-item' + (currentSpecies === sp ? " active" : "") + '" data-species="' + sp + '">';
+        html += '<div class="species-icon">' + getSharkIcon(sp) + '</div>';
+        html += '<div class="species-label">' + sp + '</div>';
+        html += '<div class="species-count">' + counts[sp] + '</div>';
+        html += '</div>';
+      }
+
+      bar.innerHTML = html;
+
+      bar.querySelectorAll(".species-item").forEach(function(item) {
+        item.addEventListener("click", function() {
+          currentSpecies = this.getAttribute("data-species");
+          render();
+        });
+      });
+    }
+
+    // ── Map Data ────────────────────────────────
+    function updateMapData() {
+      if (!mapLoaded) return;
+      var sightings = getFiltered();
+      var features = sightings.map(function(s) {
+        return {
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [s.lon, s.lat] },
+          properties: { id: s.id, title: s.title, location: s.location, type: s.type, species: s.species || "Unknown", source: s.source }
+        };
+      });
+      map.getSource("sightings").setData({ type: "FeatureCollection", features: features });
+    }
+
+    // ── Feed ─────────────────────────────────────
+    function updateFeed() {
+      var feed = document.getElementById("feed");
+      var sightings = getFiltered();
+      if (sightings.length === 0) {
+        feed.innerHTML = '<div class="empty">No sightings found</div>';
+        return;
+      }
+      var html = "";
+      for (var i = 0; i < sightings.length; i++) {
+        var s = sightings[i];
+        var badgeClass = "badge-" + s.type.toLowerCase();
+        var activeClass = s.id === selectedId ? " active" : "";
+        var accent = TYPE_COLORS[s.type] || "#3b82f6";
+        var delay = Math.min(i * 0.04, 0.8);
+
+        html += '<div class="card' + activeClass + '" data-id="' + s.id + '" style="--card-accent:' + accent + ';animation-delay:' + delay + 's">';
+        html += '<div class="card-header"><div class="card-title">' + s.title + '</div>';
+        html += '<span class="badge ' + badgeClass + '">' + s.type + '</span></div>';
+
+        if (s.species && s.species !== "Unknown") {
+          html += '<div class="card-species">' + getSharkIcon(s.species) + ' ' + s.species + '</div>';
+        }
+
+        html += '<div class="card-location">📍 ' + s.location + '</div>';
+        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + s.source + '</span><a href="' + s.url + '" target="_blank" rel="noopener">Read →</a></div>';
+        html += '</div>';
+      }
+      feed.innerHTML = html;
+
+      feed.querySelectorAll(".card").forEach(function(card) {
+        card.addEventListener("click", function(e) {
+          if (e.target.tagName === "A") return;
+          selectSighting(this.getAttribute("data-id"));
+        });
+      });
+    }
+
+    function selectSighting(id) {
+      if (activePopup) { activePopup.remove(); activePopup = null; }
+      selectedId = selectedId === id ? null : id;
+      updateFeed();
+      if (selectedId) {
+        var s = allSightings.find(function(s) { return s.id === selectedId; });
+        if (s) {
+          map.flyTo({ center: [s.lon, s.lat], zoom: 8, duration: 1200 });
+          var speciesHtml = s.species && s.species !== "Unknown"
+            ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:2px 0;">' + s.species + '</span>'
+            : '';
+          activePopup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "260px" })
+            .setLngLat([s.lon, s.lat])
+            .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + s.title.substring(0, 80) + '</p>' + speciesHtml + '<p style="margin:4px 0;font-size:11px;color:#555;">' + s.location + ' &middot; ' + s.type + '</p></div>')
+            .addTo(map);
+        }
+      }
+    }
+
+    function render() {
+      updateStats();
+      updateSpeciesBar();
+      updateMapData();
+      updateFeed();
+    }
+
+    // ── Filter buttons ──────────────────────────
+    function setFilter(filter) {
+      document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
+      var match = document.querySelector('.filter-btn[data-filter="' + filter + '"]');
+      if (match) match.classList.add("active");
+      currentFilter = filter;
+      currentSpecies = "All";
+      render();
+    }
+
+    document.querySelectorAll(".filter-btn").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        setFilter(this.getAttribute("data-filter"));
+      });
+    });
+
+    document.querySelectorAll(".stat[data-filter]").forEach(function(stat) {
+      stat.addEventListener("click", function() {
+        setFilter(this.getAttribute("data-filter"));
+      });
+    });
+
+    // ── Fetch ────────────────────────────────────
+    function fetchSightings() {
+      var btn = document.getElementById("refresh-btn");
+      btn.disabled = true;
+      btn.textContent = "Scanning…";
+      document.getElementById("loading").classList.remove("hidden");
+
+      fetch("/api/sightings")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (Array.isArray(data)) {
+            allSightings = data;
+            render();
+          }
+        })
+        .catch(function(err) { console.error("Fetch failed:", err); })
+        .finally(function() {
+          btn.disabled = false;
+          btn.textContent = "🔄 Refresh sightings";
+          document.getElementById("loading").classList.add("hidden");
+        });
+    }
+
+    document.getElementById("refresh-btn").addEventListener("click", fetchSightings);
+
+    // ── Resizable sidebar ───────────────────────
+    (function() {
+      var handle = document.getElementById("resize-handle");
+      var sidebar = document.getElementById("sidebar");
+      var dragging = false;
+      var isDesktop = function() { return window.innerWidth >= 768; };
+
+      function onStart(e) {
+        e.preventDefault();
+        dragging = true;
+        handle.classList.add("active");
+        document.body.classList.add(isDesktop() ? "resizing" : "resizing-v");
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("touchmove", onMove, { passive: false });
+        document.addEventListener("mouseup", onEnd);
+        document.addEventListener("touchend", onEnd);
+      }
+
+      function onMove(e) {
+        if (!dragging) return;
+        e.preventDefault();
+        var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        if (isDesktop()) {
+          var newWidth = window.innerWidth - clientX;
+          newWidth = Math.max(260, Math.min(newWidth, window.innerWidth * 0.65));
+          sidebar.style.width = newWidth + "px";
+        } else {
+          var newHeight = window.innerHeight - clientY;
+          newHeight = Math.max(200, Math.min(newHeight, window.innerHeight * 0.85));
+          sidebar.style.maxHeight = newHeight + "px";
+        }
+
+        map.resize();
+      }
+
+      function onEnd() {
+        dragging = false;
+        handle.classList.remove("active");
+        document.body.classList.remove("resizing", "resizing-v");
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("touchmove", onMove);
+        document.removeEventListener("mouseup", onEnd);
+        document.removeEventListener("touchend", onEnd);
+        map.resize();
+      }
+
+      handle.addEventListener("mousedown", onStart);
+      handle.addEventListener("touchstart", onStart, { passive: false });
+
+      window.addEventListener("resize", function() {
+        if (isDesktop()) {
+          sidebar.style.maxHeight = "";
+        } else {
+          sidebar.style.width = "";
+        }
+        map.resize();
+      });
+    })();
+
+    fetchSightings();
+  </script>
+</body>
+</html>

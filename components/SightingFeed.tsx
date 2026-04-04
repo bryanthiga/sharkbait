@@ -44,11 +44,11 @@ export default function SightingFeed({
 }: Props) {
   return (
     <ul className="space-y-2">
-      {sightings.map((s) => {
+      {sightings.map((s, idx) => {
         const badge = typeBadge[s.type];
         const active = s.id === selectedId;
         return (
-          <li key={s.id}>
+          <li key={`${s.id}-${idx}`}>
             <button
               onClick={() => onSelect(active ? null : s.id)}
               className={`w-full rounded-xl p-3 text-left transition ring-1 ${
