@@ -10,8 +10,18 @@
   <meta name="apple-mobile-web-app-title" content="Sharkbait">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="description" content="Track shark sightings worldwide in real time. See attacks, warnings, and encounters on a live map with species identification.">
+  <meta property="og:title" content="Sharkbait — Live Shark Tracker">
+  <meta property="og:description" content="Track shark sightings worldwide in real time. See attacks, warnings, and encounters on a live map.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="/shark-mascot.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Sharkbait — Live Shark Tracker">
+  <meta name="twitter:description" content="Track shark sightings worldwide in real time.">
+  <link rel="dns-prefetch" href="https://api.mapbox.com">
+  <link rel="preconnect" href="https://api.mapbox.com" crossorigin>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
-  <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
+  <script defer src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -458,6 +468,12 @@
   </div>
 
   <script>
+    function escapeHtml(str) {
+      var d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
     var TOKEN = "pk.eyJ1IjoiYnJ5YW50aGlnYSIsImEiOiJjbW5qaG1weGQwcTNkMnBwdXI1cTBkcTNhIn0.c96PKbqgeFGd_4NbW-w9PA";
     var TYPE_COLORS = { Attack: "#ef4444", Warning: "#f59e0b", Sighting: "#10b981", Unknown: "#3b82f6" };
 
@@ -554,7 +570,7 @@
               : '';
             activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
               .setLngLat([s.lon, s.lat])
-              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + s.title.substring(0, 80) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + s.location + ' &middot; ' + s.type + ' &middot; ' + s.source + '</p><a href="' + s.url + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
+              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + ' &middot; ' + escapeHtml(s.source) + '</p><a href="' + encodeURI(s.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
               .addTo(map);
           }
         }
@@ -606,10 +622,14 @@
 
     function updateStats() {
       var f = getFiltered();
+      var counts = { Attack: 0, Warning: 0, Sighting: 0 };
+      for (var i = 0; i < f.length; i++) {
+        if (counts[f[i].type] !== undefined) counts[f[i].type]++;
+      }
       animateCount(document.getElementById("stat-total"), f.length);
-      animateCount(document.getElementById("stat-attack"), f.filter(function(s) { return s.type === "Attack"; }).length);
-      animateCount(document.getElementById("stat-warning"), f.filter(function(s) { return s.type === "Warning"; }).length);
-      animateCount(document.getElementById("stat-sighting"), f.filter(function(s) { return s.type === "Sighting"; }).length);
+      animateCount(document.getElementById("stat-attack"), counts.Attack);
+      animateCount(document.getElementById("stat-warning"), counts.Warning);
+      animateCount(document.getElementById("stat-sighting"), counts.Sighting);
     }
 
     // ── Species Bar ─────────────────────────────
@@ -683,15 +703,15 @@
         var delay = Math.min(i * 0.04, 0.8);
 
         html += '<div class="card' + activeClass + '" data-id="' + s.id + '" style="--card-accent:' + accent + ';animation-delay:' + delay + 's">';
-        html += '<div class="card-header"><div class="card-title">' + s.title + '</div>';
-        html += '<span class="badge ' + badgeClass + '">' + s.type + '</span></div>';
+        html += '<div class="card-header"><div class="card-title">' + escapeHtml(s.title) + '</div>';
+        html += '<span class="badge ' + badgeClass + '">' + escapeHtml(s.type) + '</span></div>';
 
         if (s.species && s.species !== "Unknown") {
-          html += '<div class="card-species">' + getSharkIcon(s.species) + ' ' + s.species + '</div>';
+          html += '<div class="card-species">' + getSharkIcon(s.species) + ' ' + escapeHtml(s.species) + '</div>';
         }
 
-        html += '<div class="card-location">📍 ' + s.location + '</div>';
-        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + s.source + '</span><a href="' + s.url + '" target="_blank" rel="noopener">Read →</a></div>';
+        html += '<div class="card-location">📍 ' + escapeHtml(s.location) + '</div>';
+        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span><a href="' + encodeURI(s.url) + '" target="_blank" rel="noopener">Read →</a></div>';
         html += '</div>';
       }
       feed.innerHTML = html;

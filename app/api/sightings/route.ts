@@ -20,17 +20,21 @@ const pinnedSightings: Sighting[] = [
 let cache: { sightings: Sighting[]; fetchedAt: number } | null = null;
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
+};
+
 export async function GET() {
   try {
     if (cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
-      return NextResponse.json(cache.sightings);
+      return NextResponse.json(cache.sightings, { headers: CACHE_HEADERS });
     }
 
     const scanned = await scanForSightings();
     const sightings = [...pinnedSightings, ...scanned];
     cache = { sightings, fetchedAt: Date.now() };
 
-    return NextResponse.json(sightings);
+    return NextResponse.json(sightings, { headers: CACHE_HEADERS });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch sightings";

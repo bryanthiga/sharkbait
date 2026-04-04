@@ -115,50 +115,20 @@ const KNOWN_LOCATIONS: Record<string, { lat: number; lon: number }> = {
   "guadalupe island":   { lat: 29.0302, lon: -118.2837 },
 };
 
+const SORTED_LOCATIONS = Object.entries(KNOWN_LOCATIONS).sort(
+  (a, b) => b[0].length - a[0].length
+);
+
 function extractKnownLocation(
   title: string,
   description: string
 ): { name: string; lat: number; lon: number } | null {
   const text = `${title} ${description || ""}`.toLowerCase();
-  // Check longest names first so "new smyrna beach" matches before "beach"
-  const sorted = Object.entries(KNOWN_LOCATIONS).sort(
-    (a, b) => b[0].length - a[0].length
-  );
-  for (const [name, coords] of sorted) {
+  for (const [name, coords] of SORTED_LOCATIONS) {
     if (text.includes(name)) {
       return { name: name.replace(/\b\w/g, (c) => c.toUpperCase()), ...coords };
     }
   }
-  return null;
-}
-
-const LOCATION_PATTERNS = [
-  /(?:in|near|off|at|along)\s+(?:the\s+)?(?:coast\s+of\s+)?([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*(?:,\s*[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)?)/g,
-  /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)\s+(?:beach|coast|shore|bay|island|harbor|harbour|pier|reef)/g,
-  /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*(?:[A-Z]{2,3}|[A-Z][a-z]+))\s/g,
-];
-
-const STOP_WORDS = new Set([
-  "the", "a", "an", "new", "great", "this", "that", "shark", "white",
-  "bull", "tiger", "after", "before", "more", "most", "first", "last",
-]);
-
-function extractLocation(title: string, description: string): string | null {
-  const text = `${title} ${description || ""}`;
-  for (const pattern of LOCATION_PATTERNS) {
-    pattern.lastIndex = 0;
-    let match: RegExpExecArray | null;
-    while ((match = pattern.exec(text)) !== null) {
-      const candidate = match[1].trim().replace(/\.$/, "");
-      if (!STOP_WORDS.has(candidate.toLowerCase()) && candidate.length > 2) {
-        return candidate;
-      }
-    }
-  }
-  const cityState = text.match(
-    /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*,\s*[A-Z][A-Za-z\s]+)/
-  );
-  if (cityState) return cityState[1].trim();
   return null;
 }
 
@@ -187,43 +157,6 @@ function classifySighting(title: string, description: string): SightingType {
   if (/(warning|alert|closed|advisory|ban|closure)/.test(text)) return "Warning";
   if (/(spotted|seen|sighting|encounter|swimming)/.test(text)) return "Sighting";
   return "Unknown";
-}
-
-interface NominatimResult { lat: string; lon: string }
-
-const geocodeCache = new Map<string, { lat: number; lon: number } | null>();
-
-async function geocode(
-  locationName: string
-): Promise<{ lat: number; lon: number } | null> {
-  if (geocodeCache.has(locationName)) return geocodeCache.get(locationName)!;
-
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName)}&limit=1`,
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
-    );
-    const data: NominatimResult[] = await res.json();
-    if (data.length > 0) {
-      const result = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
-      geocodeCache.set(locationName, result);
-      return result;
-    }
-
-    const res2 = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationName + " beach")}&limit=1`,
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
-    );
-    const data2: NominatimResult[] = await res2.json();
-    if (data2.length > 0) {
-      const result = { lat: parseFloat(data2[0].lat), lon: parseFloat(data2[0].lon) };
-      geocodeCache.set(locationName, result);
-      return result;
-    }
-  } catch { /* non-fatal */ }
-
-  geocodeCache.set(locationName, null);
-  return null;
 }
 
 function delay(ms: number) {
@@ -284,45 +217,7 @@ async function fetchNewsApi(): Promise<RawArticle[]> {
   } catch { return []; }
 }
 
-// ─── Source 2: Reddit (free, no key) ────────────────────────
-
-const SHARK_SUBREDDITS = [
-  "sharks", "surfing", "marinebiology", "ocean", "scuba",
-  "Florida", "Hawaii", "SanDiego", "australia", "SouthAfrica",
-  "newzealand", "beach", "freediving",
-];
-
-async function fetchReddit(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  const weekAgo = Date.now() / 1000 - 7 * 86400;
-
-  for (const sub of SHARK_SUBREDDITS) {
-    try {
-      const res = await fetch(
-        `https://www.reddit.com/r/${sub}/search.json?q=shark&restrict_sr=on&sort=new&t=week&limit=20`,
-        { headers: { "User-Agent": "sharkbait-app/1.0 (shark sighting tracker)" } }
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      for (const post of data?.data?.children ?? []) {
-        const p = post.data;
-        if (p.created_utc < weekAgo) continue;
-        if (!SHARK_KEYWORDS_RE.test(p.title + " " + (p.selftext ?? ""))) continue;
-        results.push({
-          title: p.title,
-          text: (p.selftext ?? "").slice(0, 500),
-          url: `https://reddit.com${p.permalink}`,
-          date: new Date(p.created_utc * 1000).toISOString(),
-          source: `r/${p.subreddit}`,
-        });
-      }
-      await delay(500);
-    } catch { /* non-fatal */ }
-  }
-  return results;
-}
-
-// ─── Source 3: Google News RSS (free, no key) ───────────────
+// ─── Source 2: Google News RSS (free, no key) ───────────────
 
 const GOOGLE_NEWS_QUERIES = [
   "shark+attack", "shark+sighting", "shark+spotted+beach",
@@ -355,7 +250,7 @@ async function fetchGoogleNews(): Promise<RawArticle[]> {
   return results;
 }
 
-// ─── Source 4: Bing News RSS (free, no key) ─────────────────
+// ─── Source 3: Bing News RSS (free, no key) ─────────────────
 
 async function fetchBingNews(): Promise<RawArticle[]> {
   const results: RawArticle[] = [];
@@ -380,7 +275,7 @@ async function fetchBingNews(): Promise<RawArticle[]> {
   return results;
 }
 
-// ─── Source 5: Ocearch Shark Tracker (free, no key) ─────────
+// ─── Source 4: Ocearch Shark Tracker (free, no key) ─────────
 // Real GPS-tagged sharks — these already have coordinates!
 
 async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
@@ -406,118 +301,6 @@ async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
         source: "Ocearch Tracker",
         lat, lon,
         species: species || undefined,
-      });
-    }
-  } catch { /* non-fatal */ }
-  return results;
-}
-
-// ─── Source 6: Shark Research Committee (free, no key) ──────
-// RSS/Atom feed of recent shark incident reports from SRC
-
-async function fetchSharkResearchCommittee(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  try {
-    const res = await fetch(
-      "https://www.sharkresearchcommittee.com/pacific_coast_shark_news.htm",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
-    );
-    if (!res.ok) return [];
-    const html = await res.text();
-
-    // Extract incident blocks — each typically has a bold title + paragraph
-    const incidents = html.match(/<b>([^<]*(?:shark|attack|sighting|spotted)[^<]*)<\/b>/gi) ?? [];
-    for (const raw of incidents.slice(0, 15)) {
-      const title = raw.replace(/<\/?b>/gi, "").trim();
-      if (!SHARK_KEYWORDS_RE.test(title)) continue;
-      results.push({
-        title,
-        text: title,
-        url: "https://www.sharkresearchcommittee.com/pacific_coast_shark_news.htm",
-        date: new Date().toISOString(),
-        source: "Shark Research Committee",
-      });
-    }
-  } catch { /* non-fatal */ }
-  return results;
-}
-
-// ─── Source 7: Dorsal Watch Australia (free, no key) ────────
-
-async function fetchDorsalWatch(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  try {
-    const res = await fetch("https://dorsalwatch.com/feed/", {
-      headers: { "User-Agent": "sharkbait-app/1.0" },
-    });
-    if (!res.ok) return [];
-    const xml = await res.text();
-    for (const item of parseRssItems(xml)) {
-      results.push({
-        title: item.title,
-        text: item.description,
-        url: item.link,
-        date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-        source: "Dorsal Watch (AU)",
-      });
-    }
-  } catch { /* non-fatal */ }
-  return results;
-}
-
-// ─── Source 8: Surf Life Saving / BeachSafe (AU, free) ──────
-
-async function fetchBeachSafeAU(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  try {
-    const res = await fetch(
-      "https://beachsafe.org.au/api/warnings?type=shark",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
-    );
-    if (!res.ok) return [];
-    const data = await res.json();
-    const warnings = Array.isArray(data) ? data : data?.warnings ?? data?.results ?? [];
-    for (const w of warnings) {
-      const title = w.title ?? w.description ?? w.message ?? "Shark warning";
-      results.push({
-        title,
-        text: w.description ?? w.message ?? "",
-        url: w.url ?? "https://beachsafe.org.au",
-        date: w.date ?? w.created_at ?? new Date().toISOString(),
-        source: "BeachSafe Australia",
-      });
-    }
-  } catch { /* non-fatal */ }
-  return results;
-}
-
-// ─── Source 9: Florida Museum Shark Attack File (free) ──────
-
-async function fetchFloridaMuseum(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  try {
-    const res = await fetch(
-      "https://www.floridamuseum.ufl.edu/shark-attacks/yearly-worldwide-summary/",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
-    );
-    if (!res.ok) return [];
-    const html = await res.text();
-    const rows = html.match(/<tr[^>]*>[\s\S]*?<\/tr>/gi) ?? [];
-    for (const row of rows.slice(1, 20)) {
-      const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) ?? [];
-      if (cells.length < 3) continue;
-      const strip = (h: string) => h.replace(/<[^>]+>/g, "").trim();
-      const dateStr = strip(cells[0] ?? "");
-      const location = strip(cells[1] ?? "");
-      const activity = strip(cells[2] ?? "");
-      if (!location) continue;
-      const title = `Shark incident: ${location} — ${activity}`;
-      results.push({
-        title,
-        text: `${activity} in ${location} on ${dateStr}`,
-        url: "https://www.floridamuseum.ufl.edu/shark-attacks/",
-        date: new Date().toISOString(),
-        source: "FL Museum ISAF",
       });
     }
   } catch { /* non-fatal */ }
