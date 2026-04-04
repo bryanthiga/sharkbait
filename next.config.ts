@@ -1,13 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
+  async headers() {
     return [
       {
-        source: "/",
-        destination: "/index.html",
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
       },
     ];
+  },
+  async rewrites() {
+    return {
+      beforeFiles: [{ source: "/", destination: "/index.html" }],
+      afterFiles: [],
+      fallback: [],
+    };
   },
 };
 

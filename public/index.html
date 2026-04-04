@@ -21,7 +21,7 @@
   <link rel="dns-prefetch" href="https://api.mapbox.com">
   <link rel="preconnect" href="https://api.mapbox.com" crossorigin>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
-  <script defer src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -469,9 +469,18 @@
 
   <script>
     function escapeHtml(str) {
+      if (str == null) return "";
       var d = document.createElement("div");
-      d.textContent = str;
+      d.textContent = String(str);
       return d.innerHTML;
+    }
+
+    function safeUrl(url) {
+      try {
+        var u = new URL(url);
+        if (u.protocol === "http:" || u.protocol === "https:") return encodeURI(url);
+      } catch(e) {}
+      return "#";
     }
 
     var TOKEN = "pk.eyJ1IjoiYnJ5YW50aGlnYSIsImEiOiJjbW5qaG1weGQwcTNkMnBwdXI1cTBkcTNhIn0.c96PKbqgeFGd_4NbW-w9PA";
@@ -503,7 +512,7 @@
 
     function getSharkIcon(species) {
       var img = SHARK_IMAGES[species];
-      if (img) return '<img src="' + img + '" alt="' + species + '">';
+      if (img) return '<img src="' + img + '" alt="' + escapeHtml(species) + '">';
       return SHARK_SVG_FALLBACK;
     }
 
@@ -566,11 +575,11 @@
           var s = allSightings.find(function(s) { return s.id === props.id; });
           if (s) {
             var speciesHtml = s.species && s.species !== "Unknown"
-              ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:4px 0;">' + s.species + '</span>'
+              ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:4px 0;">' + escapeHtml(s.species) + '</span>'
               : '';
             activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
               .setLngLat([s.lon, s.lat])
-              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + ' &middot; ' + escapeHtml(s.source) + '</p><a href="' + encodeURI(s.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
+              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + ' &middot; ' + escapeHtml(s.source) + '</p><a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
               .addTo(map);
           }
         }
@@ -586,8 +595,11 @@
 
     // ── Helpers ──────────────────────────────────
     function timeAgo(dateStr) {
-      var diff = Date.now() - new Date(dateStr).getTime();
+      var ts = new Date(dateStr).getTime();
+      if (isNaN(ts)) return "recently";
+      var diff = Date.now() - ts;
       var mins = Math.floor(diff / 60000);
+      if (mins < 0) return "just now";
       if (mins < 60) return mins + "m ago";
       var hrs = Math.floor(mins / 60);
       if (hrs < 24) return hrs + "h ago";
@@ -655,9 +667,9 @@
 
       for (var i = 0; i < speciesList.length; i++) {
         var sp = speciesList[i];
-        html += '<div class="species-item' + (currentSpecies === sp ? " active" : "") + '" data-species="' + sp + '">';
+        html += '<div class="species-item' + (currentSpecies === sp ? " active" : "") + '" data-species="' + escapeHtml(sp) + '">';
         html += '<div class="species-icon">' + getSharkIcon(sp) + '</div>';
-        html += '<div class="species-label">' + sp + '</div>';
+        html += '<div class="species-label">' + escapeHtml(sp) + '</div>';
         html += '<div class="species-count">' + counts[sp] + '</div>';
         html += '</div>';
       }
@@ -683,7 +695,8 @@
           properties: { id: s.id, title: s.title, location: s.location, type: s.type, species: s.species || "Unknown", source: s.source }
         };
       });
-      map.getSource("sightings").setData({ type: "FeatureCollection", features: features });
+      var src = map.getSource("sightings");
+      if (src) src.setData({ type: "FeatureCollection", features: features });
     }
 
     // ── Feed ─────────────────────────────────────
@@ -711,7 +724,7 @@
         }
 
         html += '<div class="card-location">📍 ' + escapeHtml(s.location) + '</div>';
-        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span><a href="' + encodeURI(s.url) + '" target="_blank" rel="noopener">Read →</a></div>';
+        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span><a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener">Read →</a></div>';
         html += '</div>';
       }
       feed.innerHTML = html;
@@ -733,11 +746,11 @@
         if (s) {
           map.flyTo({ center: [s.lon, s.lat], zoom: 8, duration: 1200 });
           var speciesHtml = s.species && s.species !== "Unknown"
-            ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:2px 0;">' + s.species + '</span>'
+            ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:2px 0;">' + escapeHtml(s.species) + '</span>'
             : '';
           activePopup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "260px" })
             .setLngLat([s.lon, s.lat])
-            .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + s.title.substring(0, 80) + '</p>' + speciesHtml + '<p style="margin:4px 0;font-size:11px;color:#555;">' + s.location + ' &middot; ' + s.type + '</p></div>')
+            .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + '</p></div>')
             .addTo(map);
         }
       }
@@ -780,14 +793,23 @@
       document.getElementById("loading").classList.remove("hidden");
 
       fetch("/api/sightings")
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+          if (!r.ok) throw new Error("Server returned " + r.status);
+          return r.json();
+        })
         .then(function(data) {
           if (Array.isArray(data)) {
             allSightings = data;
             render();
+          } else {
+            throw new Error(data.error || "Unexpected response format");
           }
         })
-        .catch(function(err) { console.error("Fetch failed:", err); })
+        .catch(function(err) {
+          console.error("Fetch failed:", err);
+          var feed = document.getElementById("feed");
+          if (feed) feed.innerHTML = '<div class="empty">Failed to load sightings. Tap refresh to try again.</div>';
+        })
         .finally(function() {
           btn.disabled = false;
           btn.textContent = "🔄 Refresh sightings";
