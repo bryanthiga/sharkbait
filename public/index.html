@@ -297,6 +297,30 @@
       padding: 0 4px;
     }
 
+    /* ── Time Range Toggle ────────────────────────── */
+    .time-range {
+      display: flex; gap: 0; padding: 8px 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      justify-content: center;
+    }
+    .time-pill {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.08);
+      color: #64748b; font-size: 11px; font-weight: 600;
+      padding: 6px 18px; cursor: pointer;
+      transition: all 0.25s ease; letter-spacing: 0.02em;
+    }
+    .time-pill:first-child { border-radius: 99px 0 0 99px; }
+    .time-pill:last-child { border-radius: 0 99px 99px 0; }
+    .time-pill:not(:first-child) { border-left: none; }
+    .time-pill:hover { color: #cbd5e1; background: rgba(255,255,255,0.06); }
+    .time-pill.active {
+      background: linear-gradient(135deg, rgba(13,148,136,0.25), rgba(6,95,70,0.25));
+      color: #5eead4;
+      border-color: rgba(45,212,191,0.3);
+      box-shadow: 0 0 12px rgba(45,212,191,0.1);
+    }
+
     /* ── Filters ───────────────────────────────────── */
     .filters {
       display: flex; gap: 6px; padding: 8px 12px;
@@ -452,6 +476,13 @@
         <div class="species-bar" id="species-bar"></div>
       </div>
 
+      <div class="time-range" id="time-range">
+        <button class="time-pill active" data-range="all">All Time</button>
+        <button class="time-pill" data-range="today">Today</button>
+        <button class="time-pill" data-range="7d">7 Day</button>
+        <button class="time-pill" data-range="30d">Monthly</button>
+      </div>
+
       <div class="filters">
         <button class="filter-btn active" data-filter="All">All</button>
         <button class="filter-btn" data-filter="Attack">🔴 Attacks</button>
@@ -489,6 +520,7 @@
     var allSightings = [];
     var currentFilter = "All";
     var currentSpecies = "All";
+    var currentTimeRange = "all";
     var selectedId = null;
     var activePopup = null;
     var mapLoaded = false;
@@ -514,6 +546,11 @@
       var img = SHARK_IMAGES[species];
       if (img) return '<img src="' + img + '" alt="' + escapeHtml(species) + '">';
       return SHARK_SVG_FALLBACK;
+    }
+
+    function findSightingById(id) {
+      var sid = String(id);
+      return allSightings.find(function(s) { return String(s.id) === sid; });
     }
 
     // ── Map ──────────────────────────────────────
@@ -567,22 +604,33 @@
         }
       });
 
-      map.on("click", "sightings-dots", function(e) {
-        if (e.features && e.features.length > 0) {
-          var props = e.features[0].properties;
-          selectSighting(props.id);
-          if (activePopup) { activePopup.remove(); }
-          var s = allSightings.find(function(s) { return s.id === props.id; });
-          if (s) {
-            var speciesHtml = s.species && s.species !== "Unknown"
-              ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:4px 0;">' + escapeHtml(s.species) + '</span>'
-              : '';
-            activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
-              .setLngLat([s.lon, s.lat])
-              .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + ' &middot; ' + escapeHtml(s.source) + '</p><a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
-              .addTo(map);
-          }
-        }
+      function openMapPopupFromFeature(f) {
+        if (!f || !f.geometry || f.geometry.type !== "Point") return;
+        var props = f.properties || {};
+        var coords = f.geometry.coordinates;
+        var title = (props.title != null ? String(props.title) : "").substring(0, 80);
+        var species = props.species != null ? String(props.species) : "";
+        var location = props.location != null ? String(props.location) : "";
+        var typ = props.type != null ? String(props.type) : "";
+        var source = props.source != null ? String(props.source) : "";
+        var url = props.url != null ? String(props.url) : "";
+        if (activePopup) { activePopup.remove(); activePopup = null; }
+        selectedId = props.id;
+        updateFeed();
+        var speciesHtml = species && species !== "Unknown"
+          ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;color:#0d9488;background:rgba(13,148,136,0.1);padding:2px 7px;border-radius:99px;margin:4px 0;">' + escapeHtml(species) + '</span>'
+          : '';
+        activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
+          .setLngLat(coords)
+          .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(title) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(location) + ' &middot; ' + escapeHtml(typ) + ' &middot; ' + escapeHtml(source) + '</p><a href="' + safeUrl(url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
+          .addTo(map);
+      }
+
+      map.on("click", function(e) {
+        var features = map.queryRenderedFeatures(e.point, { layers: ["sightings-dots", "sightings-glow"] });
+        if (!features.length) return;
+        var top = features[0];
+        openMapPopupFromFeature(top);
       });
 
       map.on("mouseenter", "sightings-dots", function() { map.getCanvas().style.cursor = "pointer"; });
@@ -606,8 +654,20 @@
       return Math.floor(hrs / 24) + "d ago";
     }
 
+    function getTimeRangeCutoff() {
+      var now = Date.now();
+      if (currentTimeRange === "today") return now - 24 * 60 * 60 * 1000;
+      if (currentTimeRange === "7d") return now - 7 * 24 * 60 * 60 * 1000;
+      if (currentTimeRange === "30d") return now - 30 * 24 * 60 * 60 * 1000;
+      return 0;
+    }
+
     function getFiltered() {
       var s = allSightings;
+      var cutoff = getTimeRangeCutoff();
+      if (cutoff > 0) {
+        s = s.filter(function(x) { return new Date(x.date).getTime() >= cutoff; });
+      }
       if (currentFilter !== "All") {
         s = s.filter(function(x) { return x.type === currentFilter; });
       }
@@ -648,9 +708,14 @@
     function updateSpeciesBar() {
       var bar = document.getElementById("species-bar");
       var counts = {};
+      var cutoff = getTimeRangeCutoff();
+      var base = allSightings;
+      if (cutoff > 0) {
+        base = base.filter(function(x) { return new Date(x.date).getTime() >= cutoff; });
+      }
       var filtered = currentFilter === "All"
-        ? allSightings
-        : allSightings.filter(function(s) { return s.type === currentFilter; });
+        ? base
+        : base.filter(function(s) { return s.type === currentFilter; });
 
       filtered.forEach(function(s) {
         var sp = s.species || "Unknown";
@@ -692,7 +757,15 @@
         return {
           type: "Feature",
           geometry: { type: "Point", coordinates: [s.lon, s.lat] },
-          properties: { id: s.id, title: s.title, location: s.location, type: s.type, species: s.species || "Unknown", source: s.source }
+          properties: {
+            id: s.id,
+            title: s.title,
+            location: s.location,
+            type: s.type,
+            species: s.species || "Unknown",
+            source: s.source,
+            url: s.url || ""
+          }
         };
       });
       var src = map.getSource("sightings");
@@ -704,14 +777,15 @@
       var feed = document.getElementById("feed");
       var sightings = getFiltered();
       if (sightings.length === 0) {
-        feed.innerHTML = '<div class="empty">No sightings found</div>';
+        var rangeLabels = { all: "", today: " today", "7d": " this week", "30d": " this month" };
+        feed.innerHTML = '<div class="empty">No sightings found' + (rangeLabels[currentTimeRange] || "") + '</div>';
         return;
       }
       var html = "";
       for (var i = 0; i < sightings.length; i++) {
         var s = sightings[i];
         var badgeClass = "badge-" + s.type.toLowerCase();
-        var activeClass = s.id === selectedId ? " active" : "";
+        var activeClass = String(s.id) === String(selectedId) ? " active" : "";
         var accent = TYPE_COLORS[s.type] || "#3b82f6";
         var delay = Math.min(i * 0.04, 0.8);
 
@@ -739,10 +813,10 @@
 
     function selectSighting(id) {
       if (activePopup) { activePopup.remove(); activePopup = null; }
-      selectedId = selectedId === id ? null : id;
+      selectedId = selectedId != null && String(selectedId) === String(id) ? null : id;
       updateFeed();
       if (selectedId) {
-        var s = allSightings.find(function(s) { return s.id === selectedId; });
+        var s = findSightingById(selectedId);
         if (s) {
           map.flyTo({ center: [s.lon, s.lat], zoom: 8, duration: 1200 });
           var speciesHtml = s.species && s.species !== "Unknown"
@@ -782,6 +856,15 @@
     document.querySelectorAll(".stat[data-filter]").forEach(function(stat) {
       stat.addEventListener("click", function() {
         setFilter(this.getAttribute("data-filter"));
+      });
+    });
+
+    document.querySelectorAll(".time-pill").forEach(function(pill) {
+      pill.addEventListener("click", function() {
+        document.querySelectorAll(".time-pill").forEach(function(p) { p.classList.remove("active"); });
+        this.classList.add("active");
+        currentTimeRange = this.getAttribute("data-range");
+        render();
       });
     });
 
