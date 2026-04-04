@@ -10,12 +10,35 @@ type RawArticle = {
   source: string;
 };
 
-// Pre-geocoded results — skip the article if we already have coords
 type RawArticleWithCoords = RawArticle & {
   lat?: number;
   lon?: number;
   species?: string;
 };
+
+const FETCH_TIMEOUT_MS = 10_000;
+
+function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
+    clearTimeout(id),
+  );
+}
+
+function safeIsoDate(dateStr: string): string {
+  if (!dateStr) return new Date().toISOString();
+  try {
+    const d = new Date(dateStr);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
 
 // Known shark-prone locations with pre-baked coordinates (skips geocoding)
 const KNOWN_LOCATIONS: Record<string, { lat: number; lon: number }> = {
@@ -116,12 +139,12 @@ const KNOWN_LOCATIONS: Record<string, { lat: number; lon: number }> = {
 };
 
 const SORTED_LOCATIONS = Object.entries(KNOWN_LOCATIONS).sort(
-  (a, b) => b[0].length - a[0].length
+  (a, b) => b[0].length - a[0].length,
 );
 
-function extractKnownLocation(
+export function extractKnownLocation(
   title: string,
-  description: string
+  description: string,
 ): { name: string; lat: number; lon: number } | null {
   const text = `${title} ${description || ""}`.toLowerCase();
   for (const [name, coords] of SORTED_LOCATIONS) {
@@ -132,7 +155,7 @@ function extractKnownLocation(
   return null;
 }
 
-function extractSpecies(title: string, description: string): string {
+export function extractSpecies(title: string, description: string): string {
   const text = `${title} ${description || ""}`.toLowerCase();
   if (/great\s*white|white\s*shark|carcharodon/.test(text)) return "Great White";
   if (/tiger\s*shark|galeocerdo/.test(text)) return "Tiger";
@@ -151,7 +174,7 @@ function extractSpecies(title: string, description: string): string {
   return "Unknown";
 }
 
-function classifySighting(title: string, description: string): SightingType {
+export function classifySighting(title: string, description: string): SightingType {
   const text = `${title} ${description || ""}`.toLowerCase();
   if (/(attack|bite|bitten|mauled|fatal)/.test(text)) return "Attack";
   if (/(warning|alert|closed|advisory|ban|closure)/.test(text)) return "Warning";
@@ -163,18 +186,20 @@ function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-let idCounter = 0;
-function makeId(url: string, source: string): string {
-  const base = Buffer.from(url + source).toString("base64url").slice(0, 20);
-  return `${base}_${idCounter++}`;
+export function makeId(url: string, source: string): string {
+  return Buffer.from(url + source).toString("base64url").slice(0, 24);
 }
 
-function parseRssItems(xml: string): { title: string; link: string; pubDate: string; description: string }[] {
+export function parseRssItems(
+  xml: string,
+): { title: string; link: string; pubDate: string; description: string }[] {
   const items: { title: string; link: string; pubDate: string; description: string }[] = [];
   const itemBlocks = xml.match(/<item[\s>][\s\S]*?<\/item>/gi) ?? [];
   for (const block of itemBlocks) {
     const tag = (name: string) => {
-      const m = block.match(new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`, "i"));
+      const m = block.match(
+        new RegExp(`<${name}[^>]*>([\\s\\S]*?)<\\/${name}>`, "i"),
+      );
       return m ? m[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim() : "";
     };
     items.push({
@@ -190,7 +215,7 @@ function parseRssItems(xml: string): { title: string; link: string; pubDate: str
 const SHARK_KEYWORDS_RE =
   /shark.*(attack|sight|spot|warn|bite|encounter|seen)|great\s*white|bull\s*shark|tiger\s*shark|hammerhead/i;
 
-// ─── Source 1: NewsAPI (key required — already have it) ─────
+// ─── Source 1: NewsAPI (key required) ────────────────────────
 
 const NEWS_API_URL = "https://newsapi.org/v2/everything";
 const NEWS_SEARCH_QUERY =
@@ -207,17 +232,35 @@ async function fetchNewsApi(): Promise<RawArticle[]> {
       q: NEWS_SEARCH_QUERY, from, sortBy: "publishedAt",
       language: "en", pageSize: "50", apiKey,
     });
-    const res = await fetch(`${NEWS_API_URL}?${params}`);
+    const res = await fetchWithTimeout(`${NEWS_API_URL}?${params}`);
     const data = await res.json();
     if (data.status !== "ok") return [];
-    return (data.articles ?? []).map((a: { title: string; description: string; url: string; publishedAt: string; source: { name: string } }) => ({
-      title: a.title ?? "", text: a.description ?? "",
-      url: a.url, date: a.publishedAt, source: a.source?.name ?? "NewsAPI",
-    }));
-  } catch { return []; }
+    return (data.articles ?? [])
+      .filter((a: { title: string; description: string }) =>
+        SHARK_KEYWORDS_RE.test((a.title ?? "") + " " + (a.description ?? "")),
+      )
+      .map(
+        (a: {
+          title: string;
+          description: string;
+          url: string;
+          publishedAt: string;
+          source: { name: string };
+        }) => ({
+          title: a.title ?? "",
+          text: a.description ?? "",
+          url: a.url,
+          date: safeIsoDate(a.publishedAt),
+          source: a.source?.name ?? "NewsAPI",
+        }),
+      );
+  } catch (err) {
+    console.error("[scanner] NewsAPI failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
 }
 
-// ─── Source 2: Google News RSS (free, no key) ───────────────
+// ─── Source 2: Google News RSS (free, no key) ────────────────
 
 const GOOGLE_NEWS_QUERIES = [
   "shark+attack", "shark+sighting", "shark+spotted+beach",
@@ -228,9 +271,9 @@ async function fetchGoogleNews(): Promise<RawArticle[]> {
   const results: RawArticle[] = [];
   for (const q of GOOGLE_NEWS_QUERIES) {
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`,
-        { headers: { "User-Agent": "sharkbait-app/1.0" } }
+        { headers: { "User-Agent": "sharkbait-app/1.0" } },
       );
       if (!res.ok) continue;
       const xml = await res.text();
@@ -240,24 +283,26 @@ async function fetchGoogleNews(): Promise<RawArticle[]> {
           title: item.title,
           text: item.description,
           url: item.link,
-          date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+          date: safeIsoDate(item.pubDate),
           source: "Google News",
         });
       }
       await delay(300);
-    } catch { /* non-fatal */ }
+    } catch (err) {
+      console.error("[scanner] Google News query failed:", err instanceof Error ? err.message : err);
+    }
   }
   return results;
 }
 
-// ─── Source 3: Bing News RSS (free, no key) ─────────────────
+// ─── Source 3: Bing News RSS (free, no key) ──────────────────
 
 async function fetchBingNews(): Promise<RawArticle[]> {
   const results: RawArticle[] = [];
   try {
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       "https://www.bing.com/news/search?q=shark+attack+OR+shark+sighting&format=rss",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } }
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
     );
     if (!res.ok) return [];
     const xml = await res.text();
@@ -267,26 +312,31 @@ async function fetchBingNews(): Promise<RawArticle[]> {
         title: item.title,
         text: item.description,
         url: item.link,
-        date: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+        date: safeIsoDate(item.pubDate),
         source: "Bing News",
       });
     }
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    console.error("[scanner] Bing News failed:", err instanceof Error ? err.message : err);
+  }
   return results;
 }
 
-// ─── Source 4: Ocearch Shark Tracker (free, no key) ─────────
-// Real GPS-tagged sharks — these already have coordinates!
+// ─── Source 4: Ocearch Shark Tracker (free, no key) ──────────
 
 async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
   const results: RawArticleWithCoords[] = [];
   try {
-    const res = await fetch("https://www.ocearch.org/tracker/ajax/animals", {
-      headers: { "User-Agent": "sharkbait-app/1.0" },
-    });
+    const res = await fetchWithTimeout(
+      "https://www.ocearch.org/tracker/ajax/animals",
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
+    );
     if (!res.ok) return [];
-    const sharks = await res.json();
-    for (const shark of Array.isArray(sharks) ? sharks : []) {
+    const text = await res.text();
+    if (text.length > 2 * 1024 * 1024) return [];
+    const sharks = JSON.parse(text);
+    const items = (Array.isArray(sharks) ? sharks : []).slice(0, 500);
+    for (const shark of items) {
       const lat = parseFloat(shark.lat ?? shark.latitude ?? "");
       const lon = parseFloat(shark.lng ?? shark.lon ?? shark.longitude ?? "");
       if (isNaN(lat) || isNaN(lon)) continue;
@@ -297,31 +347,34 @@ async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
         title: `${name} (${species}) — tracked by Ocearch`,
         text: `GPS-tagged ${species} "${name}" last pinged at this location.`,
         url: `https://www.ocearch.org/tracker/detail/${shark.id ?? shark.slug ?? ""}`,
-        date: pinged ? new Date(pinged).toISOString() : new Date().toISOString(),
+        date: safeIsoDate(pinged),
         source: "Ocearch Tracker",
-        lat, lon,
+        lat,
+        lon,
         species: species || undefined,
       });
     }
-  } catch { /* non-fatal */ }
+  } catch (err) {
+    console.error("[scanner] Ocearch failed:", err instanceof Error ? err.message : err);
+  }
   return results;
 }
 
 // ─── Processing pipeline ────────────────────────────────────
 
-async function processArticles(
+export async function processArticles(
   articles: RawArticleWithCoords[],
-  seenUrls: Set<string>
+  seenUrls: Set<string>,
 ): Promise<Sighting[]> {
   const sightings: Sighting[] = [];
 
   for (const article of articles) {
-    if (seenUrls.has(article.url)) continue;
-    seenUrls.add(article.url);
+    if (article.url && seenUrls.has(article.url)) continue;
+    if (article.url) seenUrls.add(article.url);
 
-    const species = article.species || extractSpecies(article.title, article.text);
+    const species =
+      article.species || extractSpecies(article.title, article.text);
 
-    // If source already provided coords (Ocearch), use them directly
     if (article.lat != null && article.lon != null) {
       sightings.push({
         id: makeId(article.url, article.source),
@@ -338,7 +391,6 @@ async function processArticles(
       continue;
     }
 
-    // Try known locations first (instant, no API call)
     const known = extractKnownLocation(article.title, article.text);
     if (known) {
       sightings.push({
@@ -353,12 +405,7 @@ async function processArticles(
         source: article.source,
         url: article.url,
       });
-      continue;
     }
-
-    // Skip articles we can't place on the map instantly
-    // (Nominatim geocoding is too slow — 1 sec per request)
-    continue;
   }
 
   return sightings;
@@ -367,7 +414,6 @@ async function processArticles(
 // ─── Main export ────────────────────────────────────────────
 
 export async function scanForSightings(): Promise<Sighting[]> {
-  // Fast sources only — all fire in parallel, ~5 sec total
   const [newsApi, googleNews, bingNews, ocearch] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
@@ -385,9 +431,14 @@ export async function scanForSightings(): Promise<Sighting[]> {
   const seenUrls = new Set<string>();
   const sightings = await processArticles(allArticles, seenUrls);
 
-  sightings.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  sightings.sort((a, b) => {
+    const ta = new Date(a.date).getTime();
+    const tb = new Date(b.date).getTime();
+    if (isNaN(ta) && isNaN(tb)) return 0;
+    if (isNaN(ta)) return 1;
+    if (isNaN(tb)) return -1;
+    return tb - ta;
+  });
 
   return sightings;
 }
