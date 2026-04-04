@@ -390,54 +390,129 @@
     /* ── Splash Screen ────────────────────────────── */
     .splash {
       position: fixed; inset: 0; z-index: 9999;
-      background: radial-gradient(ellipse at center, #0a1628 0%, #020617 100%);
+      background: radial-gradient(ellipse at 50% 60%, #0c2440 0%, #020617 70%);
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      transition: opacity 0.6s ease, visibility 0.6s;
+      transition: opacity 0.8s ease, visibility 0.8s;
+      overflow: hidden;
     }
-    .splash.hide {
-      opacity: 0; visibility: hidden; pointer-events: none;
+    .splash.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+
+    /* Underwater light rays */
+    .splash-rays {
+      position: absolute; top: -40%; left: 50%; width: 200%; height: 200%;
+      transform: translateX(-50%);
+      background: conic-gradient(from 0deg at 50% 0%,
+        transparent 0deg, rgba(45,212,191,0.03) 10deg, transparent 20deg,
+        transparent 40deg, rgba(45,212,191,0.04) 50deg, transparent 60deg,
+        transparent 80deg, rgba(45,212,191,0.03) 90deg, transparent 100deg,
+        transparent 160deg, rgba(45,212,191,0.04) 170deg, transparent 180deg,
+        transparent 240deg, rgba(45,212,191,0.03) 250deg, transparent 260deg,
+        transparent 320deg, rgba(45,212,191,0.04) 330deg, transparent 340deg
+      );
+      animation: raysSpin 8s linear infinite;
     }
-    .splash-shark {
-      width: 180px; height: 180px;
-      animation: splashSpin 1.8s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-      filter: drop-shadow(0 0 30px rgba(45,212,191,0.3));
+    @keyframes raysSpin { to { transform: translateX(-50%) rotate(360deg); } }
+
+    /* Caustic water pattern */
+    .splash-caustics {
+      position: absolute; inset: 0;
+      background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.03' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+      opacity: 0.4; animation: causticShift 4s ease-in-out infinite alternate;
     }
-    .splash-shark img {
-      width: 100%; height: 100%; object-fit: contain;
-      border-radius: 50%;
+    @keyframes causticShift {
+      0% { transform: scale(1) translate(0, 0); }
+      100% { transform: scale(1.1) translate(-10px, -10px); }
     }
+
+    /* Orbit track */
+    .splash-orbit {
+      position: relative; width: 180px; height: 180px;
+    }
+
+    /* Shark swimming in orbit */
+    .splash-swimmer {
+      position: absolute; width: 100%; height: 100%;
+      animation: orbit 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .splash-swimmer img {
+      position: absolute; top: -45px; left: 50%; transform: translateX(-50%);
+      width: 100px; height: 100px; object-fit: cover; border-radius: 50%;
+      filter: drop-shadow(0 0 20px rgba(45,212,191,0.4));
+      animation: sharkTilt 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    @keyframes orbit {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(720deg); }
+    }
+    @keyframes sharkTilt {
+      0% { transform: translateX(-50%) scale(0.4) rotate(0deg); opacity: 0; }
+      15% { opacity: 1; }
+      50% { transform: translateX(-50%) scale(1.1) rotate(-15deg); }
+      100% { transform: translateX(-50%) scale(1) rotate(0deg); }
+    }
+
+    /* Trail particles behind shark */
+    .splash-trail {
+      position: absolute; width: 100%; height: 100%;
+      animation: orbit 2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    }
+    .splash-trail i {
+      position: absolute; top: -20px; left: 50%;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: rgba(45,212,191,0.6);
+      animation: trailFade 0.8s ease-out forwards;
+    }
+    .splash-trail i:nth-child(1) { animation-delay: 0.2s; transform: translate(-8px, 4px); }
+    .splash-trail i:nth-child(2) { animation-delay: 0.4s; width: 4px; height: 4px; transform: translate(6px, -2px); }
+    .splash-trail i:nth-child(3) { animation-delay: 0.6s; width: 8px; height: 8px; transform: translate(-4px, 8px); }
+    .splash-trail i:nth-child(4) { animation-delay: 0.8s; width: 3px; height: 3px; transform: translate(10px, 2px); }
+    .splash-trail i:nth-child(5) { animation-delay: 1.0s; transform: translate(-6px, -6px); }
+    @keyframes trailFade {
+      0% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) scale(1); }
+      30% { opacity: 0.8; }
+      100% { opacity: 0; transform: translate(var(--tx,0), var(--ty,0)) scale(0) translateY(30px); }
+    }
+
+    /* Bubbles */
+    .splash-bubbles { position: absolute; inset: 0; pointer-events: none; }
+    .splash-bubbles i {
+      position: absolute; border-radius: 50%;
+      border: 1px solid rgba(45,212,191,0.25);
+      background: rgba(45,212,191,0.05);
+      animation: bubbleRise linear forwards;
+    }
+    .splash-bubbles i:nth-child(1) { width:8px; height:8px; left:20%; bottom:-10px; animation-duration:2.2s; animation-delay:0.2s; }
+    .splash-bubbles i:nth-child(2) { width:12px; height:12px; left:35%; bottom:-10px; animation-duration:1.8s; animation-delay:0.5s; }
+    .splash-bubbles i:nth-child(3) { width:6px; height:6px; left:55%; bottom:-10px; animation-duration:2.5s; animation-delay:0.1s; }
+    .splash-bubbles i:nth-child(4) { width:10px; height:10px; left:70%; bottom:-10px; animation-duration:2s; animation-delay:0.7s; }
+    .splash-bubbles i:nth-child(5) { width:7px; height:7px; left:85%; bottom:-10px; animation-duration:2.3s; animation-delay:0.3s; }
+    .splash-bubbles i:nth-child(6) { width:14px; height:14px; left:45%; bottom:-10px; animation-duration:1.9s; animation-delay:0.9s; }
+    .splash-bubbles i:nth-child(7) { width:5px; height:5px; left:15%; bottom:-10px; animation-duration:2.4s; animation-delay:0.6s; }
+    .splash-bubbles i:nth-child(8) { width:9px; height:9px; left:60%; bottom:-10px; animation-duration:2.1s; animation-delay:0.4s; }
+    @keyframes bubbleRise {
+      0% { transform: translateY(0) translateX(0) scale(0); opacity: 0; }
+      10% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 0.4; }
+      100% { transform: translateY(-100vh) translateX(20px) scale(0.5); opacity: 0; }
+    }
+
+    /* Title block */
+    .splash-text { position: relative; z-index: 2; text-align: center; margin-top: 16px; }
     .splash-title {
-      margin-top: 20px; font-size: 28px; font-weight: 900;
+      font-size: 32px; font-weight: 900;
       background: linear-gradient(135deg, #5eead4 0%, #2dd4bf 50%, #14b8a6 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-      opacity: 0; animation: splashFadeUp 0.6s ease 0.4s forwards;
+      opacity: 0; animation: splashFadeUp 0.5s ease 0.8s forwards;
+      filter: drop-shadow(0 0 20px rgba(45,212,191,0.3));
     }
     .splash-sub {
-      margin-top: 6px; font-size: 13px; color: rgba(255,255,255,0.4);
-      letter-spacing: 0.08em; font-weight: 500;
-      opacity: 0; animation: splashFadeUp 0.6s ease 0.7s forwards;
-    }
-    .splash-ripple {
-      position: absolute; width: 200px; height: 200px;
-      border: 2px solid rgba(45,212,191,0.15);
-      border-radius: 50%;
-      animation: splashRipple 1.8s ease-out forwards;
-    }
-    .splash-ripple:nth-child(2) { animation-delay: 0.3s; }
-    .splash-ripple:nth-child(3) { animation-delay: 0.6s; }
-
-    @keyframes splashSpin {
-      0% { transform: rotate(0deg) scale(0.3); opacity: 0; }
-      30% { opacity: 1; }
-      100% { transform: rotate(360deg) scale(1); opacity: 1; }
+      margin-top: 6px; font-size: 12px; color: rgba(255,255,255,0.35);
+      letter-spacing: 0.15em; font-weight: 600;
+      opacity: 0; animation: splashFadeUp 0.5s ease 1.1s forwards;
     }
     @keyframes splashFadeUp {
-      from { opacity: 0; transform: translateY(12px); }
+      from { opacity: 0; transform: translateY(14px); }
       to { opacity: 1; transform: translateY(0); }
-    }
-    @keyframes splashRipple {
-      0% { transform: scale(0.5); opacity: 0.6; }
-      100% { transform: scale(3); opacity: 0; }
     }
 
     /* ── Animations ────────────────────────────────── */
@@ -463,12 +538,19 @@
 </head>
 <body>
   <div class="splash" id="splash">
-    <div class="splash-ripple"></div>
-    <div class="splash-ripple"></div>
-    <div class="splash-ripple"></div>
-    <div class="splash-shark"><img src="/shark-splash.png" alt="Sharkbait"></div>
-    <div class="splash-title">Sharkbait</div>
-    <div class="splash-sub">LIVE SHARK TRACKER</div>
+    <div class="splash-rays"></div>
+    <div class="splash-caustics"></div>
+    <div class="splash-bubbles">
+      <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+    </div>
+    <div class="splash-orbit">
+      <div class="splash-trail"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="splash-swimmer"><img src="/shark-splash.png" alt="Sharkbait"></div>
+    </div>
+    <div class="splash-text">
+      <div class="splash-title">Sharkbait</div>
+      <div class="splash-sub">LIVE SHARK TRACKER</div>
+    </div>
   </div>
   <div class="app">
     <div class="map-wrap">
@@ -904,8 +986,8 @@
     setTimeout(function() {
       var splash = document.getElementById("splash");
       if (splash) splash.classList.add("hide");
-      setTimeout(function() { if (splash) splash.remove(); }, 700);
-    }, 2200);
+      setTimeout(function() { if (splash) splash.remove(); }, 900);
+    }, 2800);
   </script>
 </body>
 </html>
