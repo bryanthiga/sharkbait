@@ -507,7 +507,7 @@ async function fetchFloridaMuseum(): Promise<RawArticle[]> {
       const cells = row.match(/<td[^>]*>([\s\S]*?)<\/td>/gi) ?? [];
       if (cells.length < 3) continue;
       const strip = (h: string) => h.replace(/<[^>]+>/g, "").trim();
-      const dateStr = strip(cells[0]);
+      const dateStr = strip(cells[0] ?? "");
       const location = strip(cells[1] ?? "");
       const activity = strip(cells[2] ?? "");
       if (!location) continue;
