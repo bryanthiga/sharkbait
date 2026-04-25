@@ -654,6 +654,118 @@ async function fetchRedditSubs(): Promise<RawArticle[]> {
   return results;
 }
 
+// ─── Source 3j: YouTube Data API v3 (key required) ─────────
+// No-op if YOUTUBE_API_KEY is not set, so deploys don't break.
+
+const YOUTUBE_QUERIES = [
+  "shark attack", "shark sighting", "shark spotted beach",
+  "great white shark", "tiger shark encounter",
+];
+
+async function fetchYouTube(): Promise<RawArticle[]> {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) return [];
+  const results: RawArticle[] = [];
+  // Last 14 days only — keeps the feed fresh and avoids old viral compilations
+  const publishedAfter = new Date(Date.now() - 14 * 86400000).toISOString();
+
+  for (const q of YOUTUBE_QUERIES) {
+    try {
+      const params = new URLSearchParams({
+        part: "snippet",
+        q,
+        type: "video",
+        order: "date",
+        maxResults: "15",
+        publishedAfter,
+        key: apiKey,
+      });
+      const res = await fetchWithTimeout(
+        `https://www.googleapis.com/youtube/v3/search?${params}`,
+      );
+      if (!res.ok) { await delay(150); continue; }
+      const data = await res.json();
+      for (const item of (data?.items ?? [])) {
+        const sn = item?.snippet ?? {};
+        const videoId = item?.id?.videoId;
+        if (!videoId) continue;
+        const title = sn.title ?? "";
+        const description = sn.description ?? "";
+        // Basic spam/clickbait filter: require shark keywords in title or description
+        if (!SHARK_KEYWORDS_RE.test(title + " " + description)) continue;
+        results.push({
+          title,
+          text: description,
+          url: `https://www.youtube.com/watch?v=${videoId}`,
+          date: safeIsoDate(sn.publishedAt ?? ""),
+          source: `YouTube · ${sn.channelTitle ?? "Unknown"}`,
+        });
+      }
+      await delay(200);
+    } catch (err) {
+      console.error("[scanner] YouTube query failed:", err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
+// ─── Source 3k: Twitter/X via Nitter RSS (no key, flaky) ────
+// Public Nitter instances rate-limit and die regularly. We try a small
+// list of mirrors and accept whichever responds. Empty array on failure
+// is fine — other sources cover the same ground.
+
+const NITTER_INSTANCES = [
+  "https://xcancel.com",
+  "https://nitter.privacydev.net",
+  "https://nitter.poast.org",
+  "https://nitter.net",
+];
+
+const NITTER_QUERIES = [
+  "shark attack", "shark sighting", "great white shark",
+];
+
+async function fetchNitter(): Promise<RawArticle[]> {
+  const results: RawArticle[] = [];
+  // Fan out across queries, but try instances in priority order until one responds
+  for (const q of NITTER_QUERIES) {
+    let gotResponse = false;
+    for (const instance of NITTER_INSTANCES) {
+      if (gotResponse) break;
+      try {
+        const url = `${instance}/search/rss?f=tweets&q=${encodeURIComponent(q)}`;
+        const res = await fetchWithTimeout(url, {
+          headers: { "User-Agent": "sharkbait-app/1.0" },
+        }, 4000); // tighter timeout — Nitter is slow when overloaded
+        if (!res.ok) continue;
+        const xml = await res.text();
+        const items = parseRssItems(xml);
+        if (items.length === 0) continue;
+        gotResponse = true;
+        for (const item of items) {
+          if (!SHARK_KEYWORDS_RE.test(item.title + " " + item.description)) continue;
+          // Rewrite the link to point at the real twitter.com URL
+          const link = item.link.replace(
+            new RegExp("^https?://[^/]+/"),
+            "https://twitter.com/",
+          );
+          results.push({
+            title: item.title,
+            text: item.description,
+            url: link,
+            date: safeIsoDate(item.pubDate),
+            source: "Twitter / X",
+          });
+        }
+      } catch {
+        // try next instance
+      }
+    }
+    await delay(200);
+  }
+  return results;
+}
+
 // ─── Source 3i: iNaturalist (citizen-science, GPS-tagged) ───
 // Returns research-grade shark observations with GPS coords baked in.
 
@@ -804,7 +916,7 @@ export async function scanForSightings(): Promise<Sighting[]> {
   const [
     newsApi, googleNews, bingNews, ocearch,
     intlNews, reddit, guardian, abcAU, isaf, src, dorsal,
-    redditSubs, inaturalist,
+    redditSubs, inaturalist, youtube, nitter,
   ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
@@ -819,6 +931,8 @@ export async function scanForSightings(): Promise<Sighting[]> {
     fetchDorsal(),
     fetchRedditSubs(),
     fetchINaturalist(),
+    fetchYouTube(),
+    fetchNitter(),
   ]);
 
   const allArticles: RawArticleWithCoords[] = [
@@ -835,6 +949,8 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...dorsal,
     ...redditSubs,
     ...inaturalist,
+    ...youtube,
+    ...nitter,
   ];
 
   const seenUrls = new Set<string>();
