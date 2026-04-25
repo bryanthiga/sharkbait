@@ -16,7 +16,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Sighting } from "./types";
 
-const MODEL = "claude-haiku-4-5-20251001";
+const MODEL = "claude-opus-4-7";
 const BATCH_SIZE = 40;
 
 const TRUSTED_SOURCES = new Set([
