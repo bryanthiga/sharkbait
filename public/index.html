@@ -624,6 +624,13 @@
       return SHARK_SVG_FALLBACK;
     }
 
+    // Species without a dedicated icon roll up under "Other"
+    function bucketSpecies(species) {
+      if (!species || species === "Unknown") return "Unknown";
+      if (SHARK_IMAGES[species]) return species;
+      return "Other";
+    }
+
     function findSightingById(id) {
       var sid = String(id);
       return allSightings.find(function(s) { return String(s.id) === sid; });
@@ -749,7 +756,7 @@
         s = s.filter(function(x) { return x.type === currentFilter; });
       }
       if (currentSpecies !== "All") {
-        s = s.filter(function(x) { return x.species === currentSpecies; });
+        s = s.filter(function(x) { return bucketSpecies(x.species) === currentSpecies; });
       }
       return s;
     }
@@ -795,11 +802,17 @@
         : base.filter(function(s) { return s.type === currentFilter; });
 
       filtered.forEach(function(s) {
-        var sp = s.species || "Unknown";
+        var sp = bucketSpecies(s.species);
         counts[sp] = (counts[sp] || 0) + 1;
       });
 
-      var speciesList = Object.keys(counts).sort(function(a, b) { return counts[b] - counts[a]; });
+      // Sort by count, but pin "Other" and "Unknown" to the end
+      var speciesList = Object.keys(counts).sort(function(a, b) {
+        var aLast = (a === "Other" || a === "Unknown") ? 1 : 0;
+        var bLast = (b === "Other" || b === "Unknown") ? 1 : 0;
+        if (aLast !== bLast) return aLast - bLast;
+        return counts[b] - counts[a];
+      });
 
       var html = '<div class="species-item' + (currentSpecies === "All" ? " active" : "") + '" data-species="All">';
       html += '<div class="species-icon">' + getSharkIcon("All") + '</div>';
