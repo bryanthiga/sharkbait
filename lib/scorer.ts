@@ -24,6 +24,7 @@ const TRUSTED_SOURCES = new Set([
   "Florida Museum ISAF",
   "Shark Research Committee",
   "Dorsal Watch AU",
+  "iNaturalist",
 ]);
 
 async function scoreBatch(

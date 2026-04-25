@@ -337,6 +337,12 @@ const GOOGLE_NEWS_QUERIES = [
   "shark+attack+Australia", "shark+attack+Florida",
   "shark+attack+South+Africa", "great+white+shark+California",
   "tiger+shark+Hawaii", "bull+shark+encounter",
+  // Additional regional coverage
+  "shark+attack+UK+Cornwall", "shark+sighting+New+Zealand",
+  "shark+attack+Mexico+Pacific", "shark+sighting+Long+Island",
+  "shark+attack+Cape+Cod", "shark+sighting+Caribbean",
+  "shark+attack+Egypt+Red+Sea", "shark+sighting+Maldives",
+  "shark+spotted+New+Jersey", "shark+attack+Brazil+Recife",
 ];
 
 async function fetchGoogleNews(): Promise<RawArticle[]> {
@@ -610,6 +616,97 @@ async function fetchDorsal(): Promise<RawArticle[]> {
   }
 }
 
+// ─── Source 3h: Direct subreddit feeds (new posts) ──────────
+
+const REDDIT_SUBS = ["sharks", "SharkAttacks", "marinebiology"];
+
+async function fetchRedditSubs(): Promise<RawArticle[]> {
+  const results: RawArticle[] = [];
+  for (const sub of REDDIT_SUBS) {
+    try {
+      const res = await fetchWithTimeout(
+        `https://www.reddit.com/r/${sub}/new.json?limit=25`,
+        { headers: { "User-Agent": "sharkbait-app/1.0 (shark sighting tracker)" } },
+      );
+      if (!res.ok) { await delay(200); continue; }
+      const data = await res.json();
+      for (const post of (data?.data?.children ?? [])) {
+        const p = post.data;
+        const title: string = p.title ?? "";
+        const text: string = p.selftext ?? "";
+        // r/sharks/r/SharkAttacks are already shark-focused; filter only on marinebiology
+        if (sub === "marinebiology" && !SHARK_KEYWORDS_RE.test(title + " " + text)) continue;
+        results.push({
+          title,
+          text,
+          url: `https://reddit.com${p.permalink}`,
+          date: safeIsoDate(new Date((p.created_utc ?? 0) * 1000).toISOString()),
+          source: `r/${p.subreddit ?? sub}`,
+        });
+      }
+      await delay(300);
+    } catch (err) {
+      console.error(`[scanner] Reddit r/${sub} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
+// ─── Source 3i: iNaturalist (citizen-science, GPS-tagged) ───
+// Returns research-grade shark observations with GPS coords baked in.
+
+const INAT_TAXA = [
+  { id: 47273, name: "Sharks (Selachimorpha)" },
+];
+
+async function fetchINaturalist(): Promise<RawArticleWithCoords[]> {
+  const results: RawArticleWithCoords[] = [];
+  for (const taxon of INAT_TAXA) {
+    try {
+      const params = new URLSearchParams({
+        taxon_id: String(taxon.id),
+        quality_grade: "research",
+        per_page: "100",
+        order_by: "observed_on",
+        order: "desc",
+        mappable: "true",
+        photos: "true",
+      });
+      const res = await fetchWithTimeout(
+        `https://api.inaturalist.org/v1/observations?${params}`,
+        { headers: { "User-Agent": "sharkbait-app/1.0" } },
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const obs of (data?.results ?? [])) {
+        const coords = obs?.geojson?.coordinates;
+        if (!Array.isArray(coords) || coords.length < 2) continue;
+        const lon = parseFloat(coords[0]);
+        const lat = parseFloat(coords[1]);
+        if (isNaN(lat) || isNaN(lon)) continue;
+        const commonName: string =
+          obs?.taxon?.preferred_common_name ?? obs?.taxon?.name ?? "Shark";
+        const place: string = obs?.place_guess ?? "";
+        const observedAt: string =
+          obs?.time_observed_at ?? obs?.observed_on ?? obs?.created_at ?? "";
+        results.push({
+          title: `${commonName} observed${place ? ` at ${place}` : ""}`,
+          text: place || commonName,
+          url: `https://www.inaturalist.org/observations/${obs.id}`,
+          date: safeIsoDate(observedAt),
+          source: "iNaturalist",
+          lat,
+          lon,
+          species: commonName,
+        });
+      }
+    } catch (err) {
+      console.error("[scanner] iNaturalist failed:", err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
 // ─── Source 4: Ocearch Shark Tracker (free, no key) ──────────
 
 async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
@@ -705,6 +802,7 @@ export async function scanForSightings(): Promise<Sighting[]> {
   const [
     newsApi, googleNews, bingNews, ocearch,
     intlNews, reddit, guardian, abcAU, isaf, src, dorsal,
+    redditSubs, inaturalist,
   ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
@@ -717,6 +815,8 @@ export async function scanForSightings(): Promise<Sighting[]> {
     fetchISAF(),
     fetchSRC(),
     fetchDorsal(),
+    fetchRedditSubs(),
+    fetchINaturalist(),
   ]);
 
   const allArticles: RawArticleWithCoords[] = [
@@ -731,6 +831,8 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...isaf,
     ...src,
     ...dorsal,
+    ...redditSubs,
+    ...inaturalist,
   ];
 
   const seenUrls = new Set<string>();
