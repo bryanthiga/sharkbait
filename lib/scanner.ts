@@ -266,6 +266,9 @@ async function fetchNewsApi(): Promise<RawArticle[]> {
 const GOOGLE_NEWS_QUERIES = [
   "shark+attack", "shark+sighting", "shark+spotted+beach",
   "shark+warning+beach+closure", "shark+bite",
+  "shark+attack+Australia", "shark+attack+Florida",
+  "shark+attack+South+Africa", "great+white+shark+California",
+  "tiger+shark+Hawaii", "bull+shark+encounter",
 ];
 
 async function fetchGoogleNews(): Promise<RawArticle[]> {
@@ -321,6 +324,169 @@ async function fetchBingNews(): Promise<RawArticle[]> {
     console.error("[scanner] Bing News failed:", err instanceof Error ? err.message : err);
   }
   return results;
+}
+
+// ─── Source 3b: Reddit (free, no key) ───────────────────────
+
+const REDDIT_QUERIES = ["shark attack", "shark sighting", "shark spotted"];
+
+async function fetchReddit(): Promise<RawArticle[]> {
+  const results: RawArticle[] = [];
+  for (const q of REDDIT_QUERIES) {
+    try {
+      const res = await fetchWithTimeout(
+        `https://www.reddit.com/search.json?q=${encodeURIComponent(q)}&sort=new&limit=15&t=week`,
+        { headers: { "User-Agent": "sharkbait-app/1.0 (shark sighting tracker)" } },
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      for (const post of (data?.data?.children ?? [])) {
+        const p = post.data;
+        const title: string = p.title ?? "";
+        const text: string = p.selftext ?? "";
+        if (!SHARK_KEYWORDS_RE.test(title + " " + text)) continue;
+        results.push({
+          title,
+          text,
+          url: `https://reddit.com${p.permalink}`,
+          date: safeIsoDate(new Date((p.created_utc ?? 0) * 1000).toISOString()),
+          source: `r/${p.subreddit ?? "sharks"}`,
+        });
+      }
+      await delay(300);
+    } catch (err) {
+      console.error("[scanner] Reddit query failed:", err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
+// ─── Source 3c: The Guardian sharks feed ────────────────────
+
+async function fetchGuardian(): Promise<RawArticle[]> {
+  try {
+    const res = await fetchWithTimeout(
+      "https://www.theguardian.com/environment/sharks/rss",
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
+    );
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRssItems(xml).map((item) => ({
+      title: item.title,
+      text: item.description,
+      url: item.link,
+      date: safeIsoDate(item.pubDate),
+      source: "The Guardian",
+    }));
+  } catch (err) {
+    console.error("[scanner] Guardian failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+// ─── Source 3d: ABC News Australia regional feeds ────────────
+
+const ABC_AU_FEEDS = [
+  "https://www.abc.net.au/news/feed/51120/rss.xml",   // Science & Environment
+  "https://www.abc.net.au/news/feed/2942460/rss.xml", // Western Australia
+  "https://www.abc.net.au/news/feed/2578922/rss.xml", // Queensland
+];
+
+async function fetchABCAustralia(): Promise<RawArticle[]> {
+  const results: RawArticle[] = [];
+  for (const feedUrl of ABC_AU_FEEDS) {
+    try {
+      const res = await fetchWithTimeout(
+        feedUrl,
+        { headers: { "User-Agent": "sharkbait-app/1.0" } },
+      );
+      if (!res.ok) continue;
+      const xml = await res.text();
+      for (const item of parseRssItems(xml)) {
+        if (!SHARK_KEYWORDS_RE.test(item.title + " " + item.description)) continue;
+        results.push({
+          title: item.title,
+          text: item.description,
+          url: item.link,
+          date: safeIsoDate(item.pubDate),
+          source: "ABC News AU",
+        });
+      }
+      await delay(200);
+    } catch (err) {
+      console.error("[scanner] ABC AU feed failed:", err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
+// ─── Source 3e: Florida Museum ISAF ─────────────────────────
+
+async function fetchISAF(): Promise<RawArticle[]> {
+  try {
+    const res = await fetchWithTimeout(
+      "https://www.floridamuseum.ufl.edu/shark-attacks/feed/",
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
+    );
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRssItems(xml).map((item) => ({
+      title: item.title,
+      text: item.description,
+      url: item.link,
+      date: safeIsoDate(item.pubDate),
+      source: "Florida Museum ISAF",
+    }));
+  } catch (err) {
+    console.error("[scanner] ISAF failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+// ─── Source 3f: Shark Research Committee ────────────────────
+
+async function fetchSRC(): Promise<RawArticle[]> {
+  try {
+    const res = await fetchWithTimeout(
+      "https://www.sharkresearchcommittee.com/feed/",
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
+    );
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRssItems(xml).map((item) => ({
+      title: item.title,
+      text: item.description,
+      url: item.link,
+      date: safeIsoDate(item.pubDate),
+      source: "Shark Research Committee",
+    }));
+  } catch (err) {
+    console.error("[scanner] SRC failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
+}
+
+// ─── Source 3g: Dorsal Watch AU ─────────────────────────────
+
+async function fetchDorsal(): Promise<RawArticle[]> {
+  try {
+    const res = await fetchWithTimeout(
+      "https://dorsal.org/feed/",
+      { headers: { "User-Agent": "sharkbait-app/1.0" } },
+    );
+    if (!res.ok) return [];
+    const xml = await res.text();
+    return parseRssItems(xml).map((item) => ({
+      title: item.title,
+      text: item.description,
+      url: item.link,
+      date: safeIsoDate(item.pubDate),
+      source: "Dorsal Watch AU",
+    }));
+  } catch (err) {
+    console.error("[scanner] Dorsal failed:", err instanceof Error ? err.message : err);
+    return [];
+  }
 }
 
 // ─── Source 4: Ocearch Shark Tracker (free, no key) ──────────
@@ -415,11 +581,20 @@ export async function processArticles(
 // ─── Main export ────────────────────────────────────────────
 
 export async function scanForSightings(): Promise<Sighting[]> {
-  const [newsApi, googleNews, bingNews, ocearch] = await Promise.all([
+  const [
+    newsApi, googleNews, bingNews, ocearch,
+    reddit, guardian, abcAU, isaf, src, dorsal,
+  ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
     fetchBingNews(),
     fetchOcearch(),
+    fetchReddit(),
+    fetchGuardian(),
+    fetchABCAustralia(),
+    fetchISAF(),
+    fetchSRC(),
+    fetchDorsal(),
   ]);
 
   const allArticles: RawArticleWithCoords[] = [
@@ -427,6 +602,12 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...googleNews,
     ...bingNews,
     ...ocearch,
+    ...reddit,
+    ...guardian,
+    ...abcAU,
+    ...isaf,
+    ...src,
+    ...dorsal,
   ];
 
   const seenUrls = new Set<string>();
