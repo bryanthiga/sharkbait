@@ -93,64 +93,128 @@
     }
     @keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
 
-    /* ── Resize Handle ─────────────────────────────── */
+    /* ── Resize Handle (desktop only) ──────────────── */
     .resize-handle {
-      position: relative; z-index: 20;
-      background: rgba(45,212,191,0.06);
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.2s;
-      flex-shrink: 0;
-      touch-action: none;
+      display: none; /* hidden on mobile */
     }
-    .resize-handle:hover, .resize-handle.active {
-      background: rgba(45,212,191,0.15);
-    }
-    .resize-handle .grip {
-      border-radius: 99px; background: rgba(45,212,191,0.4);
-      transition: background 0.2s, transform 0.2s;
-    }
-    .resize-handle:hover .grip, .resize-handle.active .grip {
-      background: #2dd4bf; transform: scale(1.2);
-    }
-
-    /* Mobile: horizontal bar at top of sidebar */
-    .resize-handle {
-      height: 14px; width: 100%; cursor: row-resize;
-      border-top: 1px solid rgba(45,212,191,0.1);
-    }
-    .resize-handle .grip {
-      width: 40px; height: 4px;
-    }
-
-    /* Desktop: vertical bar between map and sidebar */
     @media (min-width: 768px) {
       .resize-handle {
+        display: flex; position: relative; z-index: 20;
         width: 8px; height: 100%; cursor: col-resize;
-        border-top: none; border-left: 1px solid rgba(45,212,191,0.1);
+        background: rgba(45,212,191,0.06);
+        align-items: center; justify-content: center;
+        transition: background 0.2s;
+        flex-shrink: 0;
+        border-left: 1px solid rgba(45,212,191,0.1);
         border-right: 1px solid rgba(45,212,191,0.1);
+        touch-action: none;
       }
+      .resize-handle:hover, .resize-handle.active { background: rgba(45,212,191,0.15); }
       .resize-handle .grip {
-        width: 4px; height: 40px;
+        width: 4px; height: 40px; border-radius: 99px;
+        background: rgba(45,212,191,0.4);
+        transition: background 0.2s, transform 0.2s;
+      }
+      .resize-handle:hover .grip, .resize-handle.active .grip {
+        background: #2dd4bf; transform: scale(1.2);
       }
     }
 
     body.resizing { cursor: col-resize; user-select: none; }
-    body.resizing-v { cursor: row-resize; user-select: none; }
-    body.resizing .map-wrap, body.resizing .sidebar,
-    body.resizing-v .map-wrap, body.resizing-v .sidebar {
-      pointer-events: none;
-      transition: none;
-    }
+    body.resizing .map-wrap, body.resizing .sidebar { pointer-events: none; transition: none; }
 
     /* ── Sidebar ───────────────────────────────────── */
     .sidebar {
-      display: flex; flex-direction: column; max-height: 50dvh;
-      background: rgba(2,6,23,0.95); backdrop-filter: blur(20px);
-      overflow: hidden; min-height: 180px;
+      display: flex; flex-direction: column;
+      background: rgba(2,6,23,0.97); backdrop-filter: blur(24px);
+      overflow: hidden;
     }
+
+    /* ── Mobile bottom sheet ───────────────────────── */
+    @media (max-width: 767px) {
+      /* Map fills the full screen */
+      .map-wrap { height: 100dvh; flex: none; }
+      /* App is block so map takes full space */
+      .app { display: block; position: relative; }
+
+      .sidebar {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        height: 91dvh; /* max when fully open */
+        max-height: none; min-height: 0;
+        border-radius: 22px 22px 0 0;
+        border-top: 1px solid rgba(45,212,191,0.15);
+        box-shadow: 0 -12px 48px rgba(0,0,0,0.7), 0 -1px 0 rgba(45,212,191,0.08);
+        z-index: 30;
+        transform: translateY(var(--sheet-translate, 0px));
+        will-change: transform;
+        /* default: peek (set by JS on load) */
+        touch-action: none;
+        overscroll-behavior: contain;
+      }
+      .sidebar.sheet-snap {
+        transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+      }
+
+      /* Sheet drag handle pill */
+      .sheet-handle {
+        display: flex; align-items: center; justify-content: center;
+        padding: 10px 0 4px; flex-shrink: 0; cursor: grab;
+        user-select: none; -webkit-user-select: none;
+      }
+      .sheet-handle-pill {
+        width: 36px; height: 4px; border-radius: 99px;
+        background: rgba(255,255,255,0.18);
+        transition: background 0.2s, width 0.2s;
+      }
+      .sidebar.sheet-dragging .sheet-handle-pill {
+        background: #2dd4bf; width: 48px;
+      }
+
+      /* Stats: slightly more compact on mobile */
+      .stats { padding: 8px 10px; gap: 6px; }
+      .stat { padding: 9px 4px 7px; border-radius: 14px; }
+      .stat-num { font-size: 20px; }
+      .stat-icon { font-size: 17px; }
+      .stat-label { font-size: 7px; }
+
+      /* Species bar: only visible when sheet is half/full */
+      .species-section {
+        max-height: 0; overflow: hidden; padding: 0 12px;
+        transition: max-height 0.3s ease, padding 0.3s ease;
+      }
+      .sidebar.sheet-half .species-section,
+      .sidebar.sheet-full .species-section {
+        max-height: 120px; padding: 4px 12px 8px;
+      }
+
+      /* Bigger touch targets on filter/time pills */
+      .filter-btn { padding: 10px 14px; font-size: 12px; min-height: 40px; }
+      .time-pill { padding: 10px 16px; font-size: 12px; min-height: 40px; }
+      .filters { padding: 6px 10px; gap: 6px; }
+      .time-range { padding: 6px 10px; }
+
+      /* Cards: more readable on mobile */
+      .card { padding: 13px 14px; margin-bottom: 8px; border-radius: 16px; }
+      .card-title { font-size: 13.5px; -webkit-line-clamp: 3; }
+      .card-location { font-size: 12px; margin-top: 6px; }
+      .card-meta { font-size: 11px; margin-top: 6px; }
+      .card-meta a { font-size: 12px; }
+      .badge { font-size: 9px; padding: 4px 9px; }
+
+      /* Feed: more padding so last card isn't behind home indicator */
+      .feed { padding: 8px 10px 24px; }
+
+      /* Refresh bar */
+      .refresh-bar { padding: 6px 12px 10px; }
+      .refresh-btn { padding: 13px; font-size: 13px; border-radius: 16px; }
+    }
+
+    /* Desktop sidebar */
     @media (min-width: 768px) {
       .sidebar { max-height: none; width: 400px; min-width: 260px; max-width: 65vw; min-height: 0; }
+      .sheet-handle { display: none; }
     }
+
     .sidebar > .stats,
     .sidebar > .species-section,
     .sidebar > .filters,
@@ -474,6 +538,7 @@
 
     <div class="resize-handle" id="resize-handle"><div class="grip"></div></div>
     <div class="sidebar" id="sidebar">
+      <div class="sheet-handle" id="sheet-handle"><div class="sheet-handle-pill"></div></div>
       <div class="stats">
         <div class="stat stat-total" data-filter="All"><div class="stat-icon">🦈</div><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total</div></div>
         <div class="stat stat-attack" data-filter="Attack"><div class="stat-icon">🩸</div><div class="stat-num" id="stat-attack">0</div><div class="stat-label">Attacks</div></div>
@@ -642,6 +707,7 @@
         if (!features.length) return;
         var top = features[0];
         openMapPopupFromFeature(top);
+        window.dispatchEvent(new Event("sharkmap:select"));
       });
 
       map.on("mouseenter", "sightings-dots", function() { map.getCanvas().style.cursor = "pointer"; });
@@ -944,63 +1010,178 @@
 
     document.getElementById("refresh-btn").addEventListener("click", function() { fetchSightings(false); });
 
-    // ── Resizable sidebar ───────────────────────
+    // ── Desktop: resizable sidebar ──────────────
     (function() {
+      if (window.innerWidth < 768) return;
       var handle = document.getElementById("resize-handle");
       var sidebar = document.getElementById("sidebar");
       var dragging = false;
-      var isDesktop = function() { return window.innerWidth >= 768; };
-
-      function onStart(e) {
-        e.preventDefault();
-        dragging = true;
+      handle.addEventListener("mousedown", function(e) {
+        e.preventDefault(); dragging = true;
         handle.classList.add("active");
-        document.body.classList.add(isDesktop() ? "resizing" : "resizing-v");
+        document.body.classList.add("resizing");
         document.addEventListener("mousemove", onMove);
-        document.addEventListener("touchmove", onMove, { passive: false });
         document.addEventListener("mouseup", onEnd);
-        document.addEventListener("touchend", onEnd);
-      }
-
+      });
       function onMove(e) {
         if (!dragging) return;
-        e.preventDefault();
-        var clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        var clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-        if (isDesktop()) {
-          var newWidth = window.innerWidth - clientX;
-          newWidth = Math.max(260, Math.min(newWidth, window.innerWidth * 0.65));
-          sidebar.style.width = newWidth + "px";
-        } else {
-          var newHeight = window.innerHeight - clientY;
-          newHeight = Math.max(200, Math.min(newHeight, window.innerHeight * 0.85));
-          sidebar.style.maxHeight = newHeight + "px";
-        }
-
+        var w = Math.max(260, Math.min(window.innerWidth - e.clientX, window.innerWidth * 0.65));
+        sidebar.style.width = w + "px";
         map.resize();
       }
-
       function onEnd() {
-        dragging = false;
-        handle.classList.remove("active");
-        document.body.classList.remove("resizing", "resizing-v");
+        dragging = false; handle.classList.remove("active");
+        document.body.classList.remove("resizing");
         document.removeEventListener("mousemove", onMove);
-        document.removeEventListener("touchmove", onMove);
         document.removeEventListener("mouseup", onEnd);
-        document.removeEventListener("touchend", onEnd);
+        map.resize();
+      }
+      window.addEventListener("resize", function() { map.resize(); });
+    })();
+
+    // ── Mobile: bottom sheet ─────────────────────
+    (function() {
+      if (window.innerWidth >= 768) return;
+
+      var sidebar = document.getElementById("sidebar");
+      var handle  = document.getElementById("sheet-handle");
+      var feed    = document.getElementById("feed");
+
+      // Snap positions (px translate from bottom) — computed at runtime
+      var PEEK_SHOW = 94;   // px of sheet visible in peek mode (handle + stats)
+      var state = "peek";   // "peek" | "half" | "full"
+      var startY = 0, startTY = 0, isDragging = false;
+      var velY = 0, lastY = 0, lastT = 0;
+
+      function sheetH() { return sidebar.offsetHeight; }
+      function winH()   { return window.innerHeight; }
+
+      function translateFor(s) {
+        var h = sheetH();
+        if (s === "full") return 0;
+        if (s === "half") return h - Math.round(winH() * 0.52);
+        return h - PEEK_SHOW; // peek
+      }
+
+      function applyTranslate(ty, animate) {
+        sidebar.classList.toggle("sheet-snap", animate);
+        sidebar.classList.remove("sheet-dragging");
+        sidebar.style.setProperty("--sheet-translate", ty + "px");
+        sidebar.style.transform = "translateY(" + ty + "px)";
+      }
+
+      function snapTo(s, animate) {
+        state = s;
+        sidebar.classList.remove("sheet-peek","sheet-half","sheet-full");
+        sidebar.classList.add("sheet-" + s);
+        applyTranslate(translateFor(s), animate);
+      }
+
+      // Init — start at peek after a brief delay so the DOM is ready
+      requestAnimationFrame(function() {
+        sidebar.style.transition = "none";
+        snapTo("peek", false);
+        requestAnimationFrame(function() { sidebar.style.transition = ""; });
+      });
+
+      // Drag logic — works on both handle AND the feed (when at top of scroll)
+      function startDrag(clientY) {
+        isDragging = true;
+        startY = clientY; startTY = translateFor(state);
+        velY = 0; lastY = clientY; lastT = Date.now();
+        sidebar.classList.add("sheet-dragging");
+        sidebar.classList.remove("sheet-snap");
+      }
+
+      function moveDrag(clientY) {
+        if (!isDragging) return;
+        var now = Date.now();
+        var dt = Math.max(1, now - lastT);
+        velY = (clientY - lastY) / dt;
+        lastY = clientY; lastT = now;
+
+        var ty = startTY + (clientY - startY);
+        var max = sheetH() - PEEK_SHOW;
+        ty = Math.max(0, Math.min(ty, max));
+        sidebar.style.transform = "translateY(" + ty + "px)";
+      }
+
+      function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        sidebar.classList.remove("sheet-dragging");
+
+        var curTY  = translateFor(state) + (lastY - startY);
+        var h      = sheetH();
+        var peekTY = h - PEEK_SHOW;
+        var halfTY = h - Math.round(winH() * 0.52);
+        var fullTY = 0;
+
+        // Use velocity to bias direction
+        var THRESHOLD = 0.3; // px/ms
+        var next;
+        if (velY > THRESHOLD) {
+          // flicking down
+          next = state === "full" ? "half" : "peek";
+        } else if (velY < -THRESHOLD) {
+          // flicking up
+          next = state === "peek" ? "half" : "full";
+        } else {
+          // snap to nearest
+          var dists = [
+            { s: "peek", d: Math.abs(curTY - peekTY) },
+            { s: "half", d: Math.abs(curTY - halfTY) },
+            { s: "full", d: Math.abs(curTY - fullTY) },
+          ];
+          dists.sort(function(a,b){ return a.d - b.d; });
+          next = dists[0].s;
+        }
+        snapTo(next, true);
         map.resize();
       }
 
-      handle.addEventListener("mousedown", onStart);
-      handle.addEventListener("touchstart", onStart, { passive: false });
+      // Touch on the sheet handle
+      handle.addEventListener("touchstart", function(e) {
+        startDrag(e.touches[0].clientY);
+      }, { passive: true });
+
+      // Also allow dragging from anywhere on the sidebar header area
+      // (stats, filters) but NOT from inside the scrolling feed
+      sidebar.addEventListener("touchstart", function(e) {
+        if (feed.contains(e.target) && feed.scrollTop > 2) return; // let feed scroll
+        if (e.target.closest("button") || e.target.closest("a")) return;
+        startDrag(e.touches[0].clientY);
+      }, { passive: true });
+
+      document.addEventListener("touchmove", function(e) {
+        if (!isDragging) return;
+        // Only prevent default if we're actually moving the sheet
+        if (Math.abs(e.touches[0].clientY - startY) > 4) e.preventDefault();
+        moveDrag(e.touches[0].clientY);
+      }, { passive: false });
+
+      document.addEventListener("touchend", function() { endDrag(); });
+
+      // Tap the handle pill to cycle: peek → half → full → peek
+      handle.addEventListener("click", function() {
+        var next = state === "peek" ? "half" : state === "half" ? "full" : "peek";
+        snapTo(next, true);
+        map.resize();
+      });
+
+      // When a map pin is tapped: pull sheet to half so map is visible
+      window.addEventListener("sharkmap:select", function() {
+        if (state === "full") { snapTo("half", true); map.resize(); }
+      });
+
+      // Expand to half when a card is tapped from peek
+      sidebar.addEventListener("click", function(e) {
+        var card = e.target.closest(".card");
+        if (card && state === "peek") { snapTo("half", true); map.resize(); }
+      });
 
       window.addEventListener("resize", function() {
-        if (isDesktop()) {
-          sidebar.style.maxHeight = "";
-        } else {
-          sidebar.style.width = "";
-        }
+        snapTo(state, false);
         map.resize();
       });
     })();
