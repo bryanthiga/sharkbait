@@ -71,6 +71,29 @@
       font-weight: 500; margin-top: -2px;
     }
 
+    /* ── Mapbox zoom: below the logo, away from hamburger ─── */
+    .mapboxgl-ctrl-top-left {
+      top: 78px !important;
+      left: 14px !important;
+    }
+    .mapboxgl-ctrl-top-left .mapboxgl-ctrl {
+      background: rgba(2,6,23,0.75) !important;
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(45,212,191,0.2);
+      border-radius: 12px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+      overflow: hidden;
+    }
+    .mapboxgl-ctrl-top-left .mapboxgl-ctrl button {
+      background-color: transparent !important;
+      filter: invert(1) hue-rotate(180deg);
+    }
+    @media (max-width: 767px) {
+      .mapboxgl-ctrl-top-left { top: 70px !important; left: 12px !important; }
+      .loading-overlay { top: 70px; padding: 8px 14px; }
+      .loading-text { font-size: 11px; }
+    }
+
     /* ── Hamburger / Account drawer ────────────────── */
     .menu-btn {
       position: absolute; top: 14px; right: 14px; z-index: 40;
@@ -229,21 +252,28 @@
       .drawer { width: 100vw; max-width: 420px; }
     }
 
-    /* ── Loading ───────────────────────────────────── */
+    /* ── Loading: small banner that does NOT block the map ─ */
     .loading-overlay {
-      position: absolute; inset: 0; z-index: 10;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      position: absolute; top: 18px; left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 18px; border-radius: 999px;
+      z-index: 10; pointer-events: none;
+      background: rgba(2,6,23,0.85); backdrop-filter: blur(18px);
+      border: 1px solid rgba(45,212,191,0.2);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      display: flex; flex-direction: row; align-items: center; gap: 10px;
       background: rgba(2,6,23,0.6); backdrop-filter: blur(4px);
       pointer-events: none; transition: opacity 0.6s ease;
     }
     .loading-overlay.hidden { opacity: 0; pointer-events: none; }
 
     .loading-shark-wrap {
-      width: 80px; height: 50px; position: relative;
-      animation: swimLoading 2s ease-in-out infinite;
+      width: 24px; height: 16px; position: relative;
+      animation: swimLoading 1.6s ease-in-out infinite;
+      flex-shrink: 0;
     }
-    .loading-shark-wrap svg { width: 100%; height: 100%; fill: #2dd4bf; filter: drop-shadow(0 0 12px rgba(45,212,191,0.5)); }
-    .loading-text { margin-top: 14px; font-size: 13px; color: #94a3b8; letter-spacing: 0.02em; }
+    .loading-shark-wrap svg { width: 100%; height: 100%; fill: #2dd4bf; filter: drop-shadow(0 0 6px rgba(45,212,191,0.5)); }
+    .loading-text { margin-top: 0; font-size: 12px; color: #cbd5e1; letter-spacing: 0.01em; font-weight: 500; }
     .loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
 
     @keyframes swimLoading {
@@ -851,7 +881,7 @@
       zoom: 3.5,
       projection: "globe"
     });
-    map.addControl(new mapboxgl.NavigationControl(), "top-right");
+    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-left");
 
     map.on("load", function() {
       mapLoaded = true;

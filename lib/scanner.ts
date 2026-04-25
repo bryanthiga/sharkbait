@@ -16,7 +16,9 @@ type RawArticleWithCoords = RawArticle & {
   species?: string;
 };
 
-const FETCH_TIMEOUT_MS = 10_000;
+// 6s: tighter than 10s so slow sources can't drag down first paint.
+// Sources are fetched in parallel so this caps total wait, not per-fetch budget.
+const FETCH_TIMEOUT_MS = 6_000;
 
 function fetchWithTimeout(
   url: string,

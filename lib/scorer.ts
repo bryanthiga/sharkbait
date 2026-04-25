@@ -16,8 +16,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { Sighting } from "./types";
 
-const MODEL = "claude-opus-4-7";
-const BATCH_SIZE = 40;
+// Haiku is plenty for credibility scoring and ~4x faster than Opus, which
+// matters because this runs on the request path that gates first paint.
+const MODEL = "claude-haiku-4-5-20251001";
+const BATCH_SIZE = 60;
 
 const TRUSTED_SOURCES = new Set([
   "Ocearch Tracker",
