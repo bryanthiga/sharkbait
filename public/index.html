@@ -201,8 +201,10 @@
       .card-meta a { font-size: 12px; }
       .badge { font-size: 9px; padding: 4px 9px; }
 
-      /* Feed: more padding so last card isn't behind home indicator */
-      .feed { padding: 8px 10px 24px; }
+      /* Feed: more padding so last card isn't behind home indicator.
+         touch-action: pan-y lets the feed scroll natively even though
+         the parent .sidebar has touch-action: none for sheet dragging. */
+      .feed { padding: 8px 10px 24px; touch-action: pan-y; }
 
       /* Refresh bar */
       .refresh-bar { padding: 6px 12px 10px; }
@@ -1161,7 +1163,12 @@
       // Also allow dragging from anywhere on the sidebar header area
       // (stats, filters) but NOT from inside the scrolling feed
       sidebar.addEventListener("touchstart", function(e) {
-        if (feed.contains(e.target) && feed.scrollTop > 2) return; // let feed scroll
+        if (feed.contains(e.target)) {
+          // At "full" — let the feed scroll natively, don't hijack touches
+          if (state === "full") return;
+          // At half/peek — only let feed scroll if it's already scrolled
+          if (feed.scrollTop > 2) return;
+        }
         if (e.target.closest("button") || e.target.closest("a")) return;
         startDrag(e.touches[0].clientY);
       }, { passive: true });
