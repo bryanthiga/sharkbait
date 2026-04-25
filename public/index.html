@@ -22,6 +22,7 @@
   <link rel="preconnect" href="https://api.mapbox.com" crossorigin>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -133,6 +134,30 @@
     .drawer-subtitle {
       font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.4;
     }
+
+    .drawer-tabs {
+      display: flex; padding: 0 22px; gap: 6px; margin-bottom: 6px;
+    }
+    .drawer-tab {
+      flex: 1; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(45,212,191,0.12);
+      color: rgba(255,255,255,0.55);
+      padding: 9px 8px; font-size: 12px; font-weight: 600;
+      border-radius: 10px; cursor: pointer; font-family: inherit;
+      transition: background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .drawer-tab:hover { color: #fff; }
+    .drawer-tab.active {
+      background: rgba(45,212,191,0.12); color: #5eead4;
+      border-color: rgba(45,212,191,0.4);
+    }
+
+    .drawer-link {
+      background: none; border: none; color: rgba(94,234,212,0.7);
+      font-size: 12px; cursor: pointer; padding: 4px 0; font-family: inherit;
+      align-self: center;
+    }
+    .drawer-link:hover { color: #5eead4; text-decoration: underline; }
 
     .drawer-form {
       padding: 6px 22px 22px; display: flex; flex-direction: column; gap: 14px;
@@ -718,16 +743,21 @@
   <div class="drawer-backdrop" id="drawer-backdrop"></div>
   <aside class="drawer" id="drawer" aria-hidden="true">
     <div class="drawer-header">
-      <div class="drawer-title">Get on the list</div>
-      <div class="drawer-subtitle">
-        Accounts are coming soon. Reserve your username and we'll email you the moment they're live.
+      <div class="drawer-title" id="drawer-title">Sign in to Sharkbait</div>
+      <div class="drawer-subtitle" id="drawer-subtitle">
+        Save your favorite sightings and get notified when sharks are spotted near you.
       </div>
     </div>
 
-    <form class="drawer-form" id="signup-form" autocomplete="on" novalidate>
-      <div class="drawer-field">
+    <div class="drawer-tabs" id="drawer-tabs">
+      <button class="drawer-tab active" data-mode="signin" type="button">Sign in</button>
+      <button class="drawer-tab"        data-mode="signup" type="button">Create account</button>
+    </div>
+
+    <form class="drawer-form" id="auth-form" autocomplete="on" novalidate>
+      <div class="drawer-field" id="field-username" hidden>
         <label for="su-username">Username</label>
-        <input id="su-username" type="text" name="username" placeholder="finchaser" autocomplete="username" required minlength="2" maxlength="32">
+        <input id="su-username" type="text" name="username" placeholder="finchaser" autocomplete="username" maxlength="32">
       </div>
       <div class="drawer-field">
         <label for="su-email">Email</label>
@@ -735,18 +765,16 @@
       </div>
       <div class="drawer-field">
         <label for="su-password">Password</label>
-        <input id="su-password" type="password" name="password" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+        <input id="su-password" type="password" name="password" placeholder="••••••••" autocomplete="current-password" required minlength="8">
       </div>
-      <button class="drawer-submit" type="submit" id="signup-submit">Create account</button>
-      <div class="drawer-note">
-        Early access. Your password is never stored or sent until accounts launch — we only save your username and email locally to reserve your spot.
-      </div>
+      <button class="drawer-submit" type="submit" id="auth-submit">Sign in</button>
+      <button type="button" class="drawer-link" id="forgot-link">Forgot password?</button>
     </form>
 
     <div class="drawer-account" id="drawer-account" hidden>
-      You're on the list as <strong id="drawer-account-name"></strong>.
-      <br>We'll email <strong id="drawer-account-email"></strong> when accounts go live.
-      <br><button type="button" class="drawer-signout" id="drawer-signout">Remove me from the list</button>
+      Signed in as <strong id="drawer-account-name"></strong>
+      <br><span style="color:rgba(255,255,255,0.4);font-size:11px;" id="drawer-account-email"></span>
+      <br><button type="button" class="drawer-signout" id="drawer-signout">Sign out</button>
     </div>
   </aside>
 
@@ -1384,111 +1412,198 @@
 
     fetchSightings();
 
-    // ── Hamburger drawer + signup form (placeholder, no real auth yet) ──
+    // ── Hamburger drawer + Supabase auth ────────────────
     (function() {
-      var btn      = document.getElementById("menu-btn");
-      var drawer   = document.getElementById("drawer");
-      var backdrop = document.getElementById("drawer-backdrop");
-      var form     = document.getElementById("signup-form");
-      var submit   = document.getElementById("signup-submit");
+      var SUPABASE_URL = "https://ixknullykihbxjlcmvog.supabase.co";
+      var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aChhjIWW-XBzfK0F8UBmTA_81E6P76Q";
+
+      // Wait for the Supabase UMD script to load
+      if (typeof supabase === "undefined" || !supabase.createClient) {
+        console.warn("[auth] Supabase JS not loaded; auth disabled");
+        return;
+      }
+      var sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      });
+
+      var btn         = document.getElementById("menu-btn");
+      var drawer      = document.getElementById("drawer");
+      var backdrop    = document.getElementById("drawer-backdrop");
+      var form        = document.getElementById("auth-form");
+      var submit      = document.getElementById("auth-submit");
+      var tabs        = document.querySelectorAll(".drawer-tab");
+      var fieldUser   = document.getElementById("field-username");
+      var inputUser   = document.getElementById("su-username");
+      var inputEmail  = document.getElementById("su-email");
+      var inputPwd    = document.getElementById("su-password");
+      var titleEl     = document.getElementById("drawer-title");
+      var subtitleEl  = document.getElementById("drawer-subtitle");
+      var forgotLink  = document.getElementById("forgot-link");
       var accountBox  = document.getElementById("drawer-account");
       var accountName = document.getElementById("drawer-account-name");
       var accountMail = document.getElementById("drawer-account-email");
       var signoutBtn  = document.getElementById("drawer-signout");
-      var toastEl  = document.getElementById("toast");
-      var toastTimer = null;
-      var STORAGE_KEY = "sharkbait.earlyaccess.v1";
+      var toastEl     = document.getElementById("toast");
+      var toastTimer  = null;
+      var mode        = "signin";
 
       function showToast(msg) {
         toastEl.textContent = msg;
         toastEl.classList.add("show");
         clearTimeout(toastTimer);
-        toastTimer = setTimeout(function() { toastEl.classList.remove("show"); }, 3200);
+        toastTimer = setTimeout(function() { toastEl.classList.remove("show"); }, 4000);
       }
 
-      function openDrawer() {
-        drawer.classList.add("open");
-        backdrop.classList.add("open");
+      function openDrawer()  {
+        drawer.classList.add("open"); backdrop.classList.add("open");
         btn.classList.add("open");
         btn.setAttribute("aria-expanded", "true");
         drawer.setAttribute("aria-hidden", "false");
-        renderAccountState();
       }
       function closeDrawer() {
-        drawer.classList.remove("open");
-        backdrop.classList.remove("open");
+        drawer.classList.remove("open"); backdrop.classList.remove("open");
         btn.classList.remove("open");
         btn.setAttribute("aria-expanded", "false");
         drawer.setAttribute("aria-hidden", "true");
       }
 
-      function getAccount() {
-        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
-        catch (e) { return null; }
-      }
-      function setAccount(obj) {
-        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); } catch (e) {}
-      }
-      function clearAccount() {
-        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
-      }
-
-      function renderAccountState() {
-        var acct = getAccount();
-        if (acct && acct.username && acct.email) {
-          accountName.textContent = acct.username;
-          accountMail.textContent = acct.email;
-          accountBox.hidden = false;
-          form.style.display = "none";
+      function setMode(next) {
+        mode = next;
+        tabs.forEach(function(t) {
+          t.classList.toggle("active", t.getAttribute("data-mode") === next);
+        });
+        if (next === "signup") {
+          titleEl.textContent = "Create your account";
+          subtitleEl.textContent = "Save favorite sightings and get notified when sharks show up near you.";
+          fieldUser.hidden = false;
+          inputUser.required = true;
+          inputPwd.setAttribute("autocomplete", "new-password");
+          submit.textContent = "Create account";
+          forgotLink.style.display = "none";
         } else {
-          accountBox.hidden = true;
-          form.style.display = "";
+          titleEl.textContent = "Sign in to Sharkbait";
+          subtitleEl.textContent = "Welcome back.";
+          fieldUser.hidden = true;
+          inputUser.required = false;
+          inputPwd.setAttribute("autocomplete", "current-password");
+          submit.textContent = "Sign in";
+          forgotLink.style.display = "";
         }
       }
 
+      function renderSession(session) {
+        if (session && session.user) {
+          var u = session.user;
+          var uname = (u.user_metadata && u.user_metadata.username) || u.email.split("@")[0];
+          accountName.textContent = uname;
+          accountMail.textContent = u.email;
+          accountBox.hidden = false;
+          form.style.display = "none";
+          document.getElementById("drawer-tabs").style.display = "none";
+          titleEl.textContent = "Your account";
+          subtitleEl.textContent = "You're signed in.";
+        } else {
+          accountBox.hidden = true;
+          form.style.display = "";
+          document.getElementById("drawer-tabs").style.display = "";
+          setMode(mode); // restore title/subtitle for current mode
+        }
+      }
+
+      // Tab switching
+      tabs.forEach(function(t) {
+        t.addEventListener("click", function() { setMode(t.getAttribute("data-mode")); });
+      });
+
+      // Open / close drawer
       btn.addEventListener("click", function() {
-        if (drawer.classList.contains("open")) closeDrawer();
-        else openDrawer();
+        if (drawer.classList.contains("open")) closeDrawer(); else openDrawer();
       });
       backdrop.addEventListener("click", closeDrawer);
       document.addEventListener("keydown", function(e) {
         if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
       });
 
-      form.addEventListener("submit", function(e) {
+      // Form submit (sign in OR sign up)
+      form.addEventListener("submit", async function(e) {
         e.preventDefault();
-        var username = document.getElementById("su-username").value.trim();
-        var email    = document.getElementById("su-email").value.trim();
-        var password = document.getElementById("su-password").value;
+        var username = inputUser.value.trim();
+        var email    = inputEmail.value.trim();
+        var password = inputPwd.value;
 
-        if (username.length < 2) { showToast("Pick a username (2+ chars)"); return; }
         if (!/^\S+@\S+\.\S+$/.test(email)) { showToast("Enter a valid email"); return; }
         if (password.length < 8) { showToast("Password must be 8+ characters"); return; }
+        if (mode === "signup" && username.length < 2) { showToast("Pick a username (2+ chars)"); return; }
 
-        // NOTE: password is intentionally NOT stored anywhere. Once accounts
-        // are wired up to a real auth provider, this handler will POST to it.
         submit.disabled = true;
-        submit.textContent = "Saving…";
+        submit.textContent = mode === "signup" ? "Creating…" : "Signing in…";
 
-        // Simulate a tiny delay so it feels responsive
-        setTimeout(function() {
-          setAccount({ username: username, email: email, joinedAt: Date.now() });
+        try {
+          if (mode === "signup") {
+            var resUp = await sb.auth.signUp({
+              email: email,
+              password: password,
+              options: { data: { username: username } },
+            });
+            if (resUp.error) throw resUp.error;
+            if (resUp.data && resUp.data.user && !resUp.data.session) {
+              showToast("Check your email to confirm your account.");
+            } else {
+              showToast("Welcome aboard, " + username + "!");
+            }
+            form.reset();
+          } else {
+            var resIn = await sb.auth.signInWithPassword({ email: email, password: password });
+            if (resIn.error) throw resIn.error;
+            showToast("Signed in.");
+            form.reset();
+          }
+        } catch (err) {
+          showToast(err && err.message ? err.message : "Something went wrong");
+        } finally {
           submit.disabled = false;
-          submit.textContent = "Create account";
-          form.reset();
-          showToast("You're on the list! We'll email you when accounts go live.");
-          renderAccountState();
-        }, 350);
+          submit.textContent = mode === "signup" ? "Create account" : "Sign in";
+        }
       });
 
-      signoutBtn.addEventListener("click", function() {
-        clearAccount();
-        renderAccountState();
-        showToast("Removed from the list.");
+      // Forgot password
+      forgotLink.addEventListener("click", async function() {
+        var email = inputEmail.value.trim();
+        if (!/^\S+@\S+\.\S+$/.test(email)) {
+          showToast("Enter your email above first");
+          return;
+        }
+        try {
+          var res = await sb.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin,
+          });
+          if (res.error) throw res.error;
+          showToast("Password reset link sent to " + email);
+        } catch (err) {
+          showToast(err && err.message ? err.message : "Could not send reset email");
+        }
       });
 
-      // Initial render in case the user reopens the page
-      renderAccountState();
+      // Sign out
+      signoutBtn.addEventListener("click", async function() {
+        try {
+          await sb.auth.signOut();
+          showToast("Signed out");
+        } catch (err) {
+          showToast("Sign out failed");
+        }
+      });
+
+      // React to auth state changes (sign in, sign out, token refresh)
+      sb.auth.onAuthStateChange(function(_event, session) {
+        renderSession(session);
+      });
+
+      // Hydrate initial state
+      sb.auth.getSession().then(function(res) {
+        renderSession(res.data && res.data.session);
+      });
+      setMode("signin");
     })();
 
   </script>
