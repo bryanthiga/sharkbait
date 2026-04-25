@@ -126,6 +126,8 @@ const KNOWN_LOCATIONS: Record<string, { lat: number; lon: number }> = {
   "south africa":       { lat: -33.9050, lon: 18.3900 },
   // Other hotspots (coastal)
   "reunion island":     { lat: -21.1151, lon: 55.5364 },
+  "île de la réunion":  { lat: -21.1151, lon: 55.5364 },
+  "la réunion":         { lat: -21.1151, lon: 55.5364 },
   "bahamas":            { lat: 25.0343, lon: -77.3963 },
   "fiji":               { lat: -17.7134, lon: 178.0650 },
   "new zealand":        { lat: -36.8500, lon: 174.7800 },
@@ -133,10 +135,72 @@ const KNOWN_LOCATIONS: Record<string, { lat: number; lon: number }> = {
   "red sea":            { lat: 27.2579, lon: 33.8116 },
   "sharm el sheikh":    { lat: 27.9158, lon: 34.3300 },
   "brazil":             { lat: -8.0476, lon: -34.8770 },
+  "brasil":             { lat: -8.0476, lon: -34.8770 },
   "recife":             { lat: -8.0476, lon: -34.8770 },
+  "pernambuco":         { lat: -8.3500, lon: -34.9900 },
+  "natal":              { lat: -5.7945, lon: -35.2110 },
   "mexico":             { lat: 23.6345, lon: -109.9613 },
+  "méxico":             { lat: 23.6345, lon: -109.9613 },
   "cancun":             { lat: 21.1619, lon: -86.8515 },
+  "cancún":             { lat: 21.1619, lon: -86.8515 },
   "guadalupe island":   { lat: 29.0302, lon: -118.2837 },
+  "isla guadalupe":     { lat: 29.0302, lon: -118.2837 },
+  // Europe — Mediterranean / Atlantic
+  "nice":               { lat: 43.6950, lon: 7.2620 },
+  "cannes":             { lat: 43.5513, lon: 7.0128 },
+  "marseille":          { lat: 43.2920, lon: 5.3690 },
+  "barcelona":          { lat: 41.3851, lon: 2.1734 },
+  "alicante":           { lat: 38.3553, lon: -0.4815 },
+  "sardinia":           { lat: 40.1209, lon: 9.0129 },
+  "sicily":             { lat: 37.6000, lon: 14.0154 },
+  "naples":             { lat: 40.8518, lon: 14.2681 },
+  "costa brava":        { lat: 41.8200, lon: 3.0600 },
+  "canary islands":     { lat: 28.2916, lon: -16.6291 },
+  "gran canaria":       { lat: 27.9202, lon: -15.5474 },
+  "tenerife":           { lat: 28.2916, lon: -16.6291 },
+  "azores":             { lat: 37.7412, lon: -25.6756 },
+  "madeira":            { lat: 32.7607, lon: -16.9595 },
+  "adriatic sea":       { lat: 43.5100, lon: 16.4200 },
+  "mediterranean sea":  { lat: 35.5000, lon: 18.0000 },
+  "mediterranean":      { lat: 35.5000, lon: 18.0000 },
+  // Asia-Pacific
+  "okinawa":            { lat: 26.2124, lon: 127.6792 },
+  "bali":               { lat: -8.4095, lon: 115.1889 },
+  "lombok":             { lat: -8.6500, lon: 116.3240 },
+  "komodo":             { lat: -8.5500, lon: 119.4900 },
+  "lombok strait":      { lat: -8.7600, lon: 115.8600 },
+  "indonesia":          { lat: -8.4095, lon: 115.1889 },
+  "indonesia coast":    { lat: -8.4095, lon: 115.1889 },
+  "philippines":        { lat: 12.8797, lon: 121.7740 },
+  "palawan":            { lat: 9.8349, lon: 118.7384 },
+  "cebu":               { lat: 10.3157, lon: 123.8854 },
+  "thailand":           { lat: 7.8804, lon: 98.3923 },
+  "phuket":             { lat: 7.8804, lon: 98.3923 },
+  "koh samui":          { lat: 9.5120, lon: 100.0136 },
+  "japan":              { lat: 26.2124, lon: 127.6792 },
+  "okinawa island":     { lat: 26.2124, lon: 127.6792 },
+  "amami":              { lat: 28.3743, lon: 129.4940 },
+  // Indian Ocean / Africa
+  "maldives":           { lat: 3.2028, lon: 73.2207 },
+  "seychelles":         { lat: -4.6796, lon: 55.4920 },
+  "mauritius":          { lat: -20.3484, lon: 57.5522 },
+  "mozambique":         { lat: -18.6657, lon: 35.5296 },
+  "kenya":              { lat: -4.0435, lon: 39.6682 },
+  "tanzania":           { lat: -6.7924, lon: 39.2083 },
+  "zanzibar":           { lat: -6.1659, lon: 39.2026 },
+  "madagascar":         { lat: -18.7669, lon: 46.8691 },
+  // Caribbean
+  "martinique":         { lat: 14.6415, lon: -61.0242 },
+  "guadeloupe":         { lat: 16.2650, lon: -61.5510 },
+  "cuba":               { lat: 22.3193, lon: -79.0310 },
+  "puerto rico":        { lat: 18.2208, lon: -66.5901 },
+  "jamaica":            { lat: 18.1096, lon: -77.2975 },
+  "barbados":           { lat: 13.1939, lon: -59.5432 },
+  "trinidad":           { lat: 10.6918, lon: -61.2225 },
+  "costa rica":         { lat: 9.7489, lon: -83.7534 },
+  "cocos island":       { lat: 5.5304, lon: -87.0587 },
+  "galapagos":          { lat: -0.9538, lon: -90.9656 },
+  "galápagos":          { lat: -0.9538, lon: -90.9656 },
 };
 
 const SORTED_LOCATIONS = Object.entries(KNOWN_LOCATIONS).sort(
@@ -177,9 +241,12 @@ export function extractSpecies(title: string, description: string): string {
 
 export function classifySighting(title: string, description: string): SightingType {
   const text = `${title} ${description || ""}`.toLowerCase();
-  if (/(attack|bite|bitten|mauled|fatal)/.test(text)) return "Attack";
-  if (/(warning|alert|closed|advisory|ban|closure)/.test(text)) return "Warning";
-  if (/(spotted|seen|sighting|encounter|swimming)/.test(text)) return "Sighting";
+  // Attack — EN + ES + PT + FR + IT + JA + ID
+  if (/(attack|bite|bitten|mauled|fatal|ataque|atacado|attaque|mordu|blessé|attacco|morso|被害|咬|serangan|diserang|biss|gebissen)/.test(text)) return "Attack";
+  // Warning — EN + ES + PT + FR + IT + JA + ID
+  if (/(warning|alert|closed|advisory|ban|closure|alerta|aviso|fechado|avertissement|fermeture|interdiction|allerta|chiusura|注意|警告|peringatan|larangan)/.test(text)) return "Warning";
+  // Sighting — EN + ES + PT + FR + IT + JA + ID + ZH
+  if (/(spotted|seen|sighting|encounter|swimming|avistamiento|avistado|avistamento|observation|observé|avvistamento|avvistato|目撃|発見|penampakan|terlihat|发现|看到)/.test(text)) return "Sighting";
   return "Unknown";
 }
 
@@ -213,8 +280,9 @@ export function parseRssItems(
   return items;
 }
 
+// English + multilingual shark keywords (ES/PT/FR/IT/DE/JA/ID/ZH)
 const SHARK_KEYWORDS_RE =
-  /shark.*(attack|sight|spot|warn|bite|encounter|seen)|great\s*white|bull\s*shark|tiger\s*shark|hammerhead/i;
+  /shark.*(attack|sight|spot|warn|bite|encounter|seen)|great\s*white|bull\s*shark|tiger\s*shark|hammerhead|tiburón|tibur[oó]n|tubarão|tubar[aã]o|requin|squalo|haiangriff|hai\b|サメ|鲨鱼|鯊魚|hiu.*(serangan|makan)|serangan\s*hiu/i;
 
 // ─── Source 1: NewsAPI (key required) ────────────────────────
 
@@ -326,7 +394,60 @@ async function fetchBingNews(): Promise<RawArticle[]> {
   return results;
 }
 
-// ─── Source 3b: Reddit (free, no key) ───────────────────────
+// ─── Source 3b: International Google News (8 languages) ──────
+// Each entry: query in native language, Google News locale params
+const INTL_NEWS_FEEDS = [
+  // Spanish — Latin America (tiburón = shark)
+  { q: "tiburón+ataque",        hl: "es", gl: "MX", ceid: "MX:es",    label: "Google News ES" },
+  { q: "tiburón+avistamiento",  hl: "es", gl: "AR", ceid: "AR:es",    label: "Google News ES" },
+  // Portuguese — Brazil (tubarão = shark)
+  { q: "tubarão+ataque",        hl: "pt", gl: "BR", ceid: "BR:pt-419", label: "Google News PT" },
+  { q: "tubarão+avistamento",   hl: "pt", gl: "BR", ceid: "BR:pt-419", label: "Google News PT" },
+  // French — France + Indian Ocean territories (requin = shark)
+  { q: "requin+attaque",        hl: "fr", gl: "FR", ceid: "FR:fr",    label: "Google News FR" },
+  { q: "requin+alerte",         hl: "fr", gl: "FR", ceid: "FR:fr",    label: "Google News FR" },
+  // Italian — Mediterranean (squalo = shark)
+  { q: "squalo+attacco",        hl: "it", gl: "IT", ceid: "IT:it",    label: "Google News IT" },
+  { q: "squalo+avvistamento",   hl: "it", gl: "IT", ceid: "IT:it",    label: "Google News IT" },
+  // German — occasional North Sea / tourist incidents (Hai = shark)
+  { q: "Haiangriff",            hl: "de", gl: "DE", ceid: "DE:de",    label: "Google News DE" },
+  // Japanese — Okinawa, Pacific coast (サメ = shark)
+  { q: "サメ+被害",               hl: "ja", gl: "JP", ceid: "JP:ja",    label: "Google News JA" },
+  { q: "サメ+目撃",               hl: "ja", gl: "JP", ceid: "JP:ja",    label: "Google News JA" },
+  // Indonesian — Bali, Lombok, Papua surfer incidents (hiu = shark)
+  { q: "hiu+serangan",          hl: "id", gl: "ID", ceid: "ID:id",    label: "Google News ID" },
+  { q: "hiu+wisatawan",         hl: "id", gl: "ID", ceid: "ID:id",    label: "Google News ID" },
+  // Chinese — South China Sea, Hainan (鲨鱼 = shark)
+  { q: "鲨鱼+攻击",               hl: "zh-CN", gl: "CN", ceid: "CN:zh-Hans", label: "Google News ZH" },
+];
+
+async function fetchInternationalNews(): Promise<RawArticle[]> {
+  const results: RawArticle[] = [];
+  for (const feed of INTL_NEWS_FEEDS) {
+    try {
+      const url = `https://news.google.com/rss/search?q=${feed.q}&hl=${feed.hl}&gl=${feed.gl}&ceid=${feed.ceid}`;
+      const res = await fetchWithTimeout(url, { headers: { "User-Agent": "sharkbait-app/1.0" } });
+      if (!res.ok) { await delay(200); continue; }
+      const xml = await res.text();
+      for (const item of parseRssItems(xml)) {
+        // Accept all items from these language-targeted feeds (already keyword-targeted)
+        results.push({
+          title: item.title,
+          text: item.description,
+          url: item.link,
+          date: safeIsoDate(item.pubDate),
+          source: feed.label,
+        });
+      }
+      await delay(250); // be polite to Google News
+    } catch (err) {
+      console.error(`[scanner] Intl news ${feed.hl} failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+  return results;
+}
+
+// ─── Source 3c: Reddit (free, no key) ───────────────────────
 
 const REDDIT_QUERIES = ["shark attack", "shark sighting", "shark spotted"];
 
@@ -583,12 +704,13 @@ export async function processArticles(
 export async function scanForSightings(): Promise<Sighting[]> {
   const [
     newsApi, googleNews, bingNews, ocearch,
-    reddit, guardian, abcAU, isaf, src, dorsal,
+    intlNews, reddit, guardian, abcAU, isaf, src, dorsal,
   ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
     fetchBingNews(),
     fetchOcearch(),
+    fetchInternationalNews(),
     fetchReddit(),
     fetchGuardian(),
     fetchABCAustralia(),
@@ -602,6 +724,7 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...googleNews,
     ...bingNews,
     ...ocearch,
+    ...intlNews,
     ...reddit,
     ...guardian,
     ...abcAU,
