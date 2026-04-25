@@ -70,6 +70,140 @@
       font-weight: 500; margin-top: -2px;
     }
 
+    /* ── Hamburger / Account drawer ────────────────── */
+    .menu-btn {
+      position: absolute; top: 14px; right: 14px; z-index: 40;
+      width: 44px; height: 44px; border-radius: 14px;
+      background: rgba(2,6,23,0.75); backdrop-filter: blur(20px);
+      border: 1px solid rgba(45,212,191,0.2);
+      box-shadow: 0 6px 32px rgba(0,0,0,0.5), 0 0 20px rgba(45,212,191,0.08);
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.3s;
+    }
+    .menu-btn:hover {
+      transform: scale(1.06);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5), 0 0 30px rgba(45,212,191,0.15);
+    }
+    .menu-btn:active { transform: scale(0.94); }
+    .menu-btn span {
+      display: block; width: 18px; height: 2px; border-radius: 2px;
+      background: #5eead4; position: relative;
+      transition: transform 0.3s, opacity 0.2s, top 0.3s;
+    }
+    .menu-btn span::before, .menu-btn span::after {
+      content: ""; position: absolute; left: 0; width: 18px; height: 2px;
+      border-radius: 2px; background: #5eead4;
+      transition: transform 0.3s, top 0.3s;
+    }
+    .menu-btn span::before { top: -6px; }
+    .menu-btn span::after  { top:  6px; }
+    .menu-btn.open span { background: transparent; }
+    .menu-btn.open span::before { top: 0; transform: rotate(45deg); }
+    .menu-btn.open span::after  { top: 0; transform: rotate(-45deg); }
+
+    .drawer-backdrop {
+      position: fixed; inset: 0; z-index: 45;
+      background: rgba(2,6,23,0.55); backdrop-filter: blur(4px);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .drawer-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .drawer {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 50;
+      width: min(380px, 92vw);
+      background: rgba(2,6,23,0.98); backdrop-filter: blur(24px);
+      border-left: 1px solid rgba(45,212,191,0.15);
+      box-shadow: -12px 0 48px rgba(0,0,0,0.6);
+      transform: translateX(100%);
+      transition: transform 0.42s cubic-bezier(0.32, 0.72, 0, 1);
+      display: flex; flex-direction: column;
+      overflow-y: auto; -webkit-overflow-scrolling: touch;
+    }
+    .drawer.open { transform: translateX(0); }
+
+    .drawer-header {
+      padding: 20px 22px 12px; flex-shrink: 0;
+    }
+    .drawer-title {
+      font-size: 22px; font-weight: 800; color: #fff;
+      letter-spacing: -0.01em; margin-bottom: 4px;
+    }
+    .drawer-subtitle {
+      font-size: 12px; color: rgba(255,255,255,0.5); line-height: 1.4;
+    }
+
+    .drawer-form {
+      padding: 6px 22px 22px; display: flex; flex-direction: column; gap: 14px;
+    }
+    .drawer-field { display: flex; flex-direction: column; gap: 6px; }
+    .drawer-field label {
+      font-size: 11px; font-weight: 600; color: #5eead4;
+      letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .drawer-field input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(45,212,191,0.18);
+      border-radius: 12px; padding: 12px 14px;
+      color: #fff; font-size: 14px; font-family: inherit;
+      transition: border-color 0.2s, background 0.2s;
+      -webkit-appearance: none; appearance: none;
+    }
+    .drawer-field input:focus {
+      outline: none; border-color: #2dd4bf;
+      background: rgba(45,212,191,0.06);
+    }
+    .drawer-field input::placeholder { color: rgba(255,255,255,0.3); }
+
+    .drawer-submit {
+      margin-top: 6px; padding: 14px;
+      background: linear-gradient(135deg, #2dd4bf 0%, #14b8a6 100%);
+      color: #022c22; font-weight: 700; font-size: 14px;
+      border: none; border-radius: 14px; cursor: pointer;
+      letter-spacing: 0.02em;
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.2s;
+    }
+    .drawer-submit:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(45,212,191,0.25); }
+    .drawer-submit:active { transform: translateY(0); }
+    .drawer-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .drawer-note {
+      font-size: 11px; color: rgba(255,255,255,0.45); line-height: 1.5;
+      text-align: center; padding: 0 8px;
+    }
+
+    .drawer-account {
+      padding: 14px 22px;
+      border-top: 1px solid rgba(45,212,191,0.1);
+      margin-top: auto;
+      font-size: 12px; color: rgba(255,255,255,0.6);
+    }
+    .drawer-account strong { color: #5eead4; }
+    .drawer-signout {
+      margin-top: 8px; background: none; border: none;
+      color: #f87171; font-size: 12px; cursor: pointer; padding: 0;
+      font-family: inherit;
+    }
+    .drawer-signout:hover { text-decoration: underline; }
+
+    .toast {
+      position: fixed; left: 50%; bottom: 28px; transform: translate(-50%, 24px);
+      background: rgba(2,6,23,0.95); backdrop-filter: blur(20px);
+      color: #fff; padding: 12px 20px; border-radius: 999px;
+      border: 1px solid rgba(45,212,191,0.3); z-index: 60;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (max-width: 767px) {
+      .menu-btn { top: 12px; right: 12px; }
+      .drawer { width: 100vw; max-width: 420px; }
+    }
+
     /* ── Loading ───────────────────────────────────── */
     .loading-overlay {
       position: absolute; inset: 0; z-index: 10;
@@ -575,6 +709,48 @@
       </div>
     </div>
   </div>
+
+  <!-- Hamburger button (top-right, mobile + desktop) -->
+  <button class="menu-btn" id="menu-btn" aria-label="Open menu" aria-expanded="false">
+    <span></span>
+  </button>
+
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div class="drawer-title">Get on the list</div>
+      <div class="drawer-subtitle">
+        Accounts are coming soon. Reserve your username and we'll email you the moment they're live.
+      </div>
+    </div>
+
+    <form class="drawer-form" id="signup-form" autocomplete="on" novalidate>
+      <div class="drawer-field">
+        <label for="su-username">Username</label>
+        <input id="su-username" type="text" name="username" placeholder="finchaser" autocomplete="username" required minlength="2" maxlength="32">
+      </div>
+      <div class="drawer-field">
+        <label for="su-email">Email</label>
+        <input id="su-email" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
+      </div>
+      <div class="drawer-field">
+        <label for="su-password">Password</label>
+        <input id="su-password" type="password" name="password" placeholder="••••••••" autocomplete="new-password" required minlength="8">
+      </div>
+      <button class="drawer-submit" type="submit" id="signup-submit">Create account</button>
+      <div class="drawer-note">
+        Early access. Your password is never stored or sent until accounts launch — we only save your username and email locally to reserve your spot.
+      </div>
+    </form>
+
+    <div class="drawer-account" id="drawer-account" hidden>
+      You're on the list as <strong id="drawer-account-name"></strong>.
+      <br>We'll email <strong id="drawer-account-email"></strong> when accounts go live.
+      <br><button type="button" class="drawer-signout" id="drawer-signout">Remove me from the list</button>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast"></div>
 
   <script>
     function escapeHtml(str) {
@@ -1207,6 +1383,113 @@
     })();
 
     fetchSightings();
+
+    // ── Hamburger drawer + signup form (placeholder, no real auth yet) ──
+    (function() {
+      var btn      = document.getElementById("menu-btn");
+      var drawer   = document.getElementById("drawer");
+      var backdrop = document.getElementById("drawer-backdrop");
+      var form     = document.getElementById("signup-form");
+      var submit   = document.getElementById("signup-submit");
+      var accountBox  = document.getElementById("drawer-account");
+      var accountName = document.getElementById("drawer-account-name");
+      var accountMail = document.getElementById("drawer-account-email");
+      var signoutBtn  = document.getElementById("drawer-signout");
+      var toastEl  = document.getElementById("toast");
+      var toastTimer = null;
+      var STORAGE_KEY = "sharkbait.earlyaccess.v1";
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(function() { toastEl.classList.remove("show"); }, 3200);
+      }
+
+      function openDrawer() {
+        drawer.classList.add("open");
+        backdrop.classList.add("open");
+        btn.classList.add("open");
+        btn.setAttribute("aria-expanded", "true");
+        drawer.setAttribute("aria-hidden", "false");
+        renderAccountState();
+      }
+      function closeDrawer() {
+        drawer.classList.remove("open");
+        backdrop.classList.remove("open");
+        btn.classList.remove("open");
+        btn.setAttribute("aria-expanded", "false");
+        drawer.setAttribute("aria-hidden", "true");
+      }
+
+      function getAccount() {
+        try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "null"); }
+        catch (e) { return null; }
+      }
+      function setAccount(obj) {
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(obj)); } catch (e) {}
+      }
+      function clearAccount() {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+      }
+
+      function renderAccountState() {
+        var acct = getAccount();
+        if (acct && acct.username && acct.email) {
+          accountName.textContent = acct.username;
+          accountMail.textContent = acct.email;
+          accountBox.hidden = false;
+          form.style.display = "none";
+        } else {
+          accountBox.hidden = true;
+          form.style.display = "";
+        }
+      }
+
+      btn.addEventListener("click", function() {
+        if (drawer.classList.contains("open")) closeDrawer();
+        else openDrawer();
+      });
+      backdrop.addEventListener("click", closeDrawer);
+      document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
+      });
+
+      form.addEventListener("submit", function(e) {
+        e.preventDefault();
+        var username = document.getElementById("su-username").value.trim();
+        var email    = document.getElementById("su-email").value.trim();
+        var password = document.getElementById("su-password").value;
+
+        if (username.length < 2) { showToast("Pick a username (2+ chars)"); return; }
+        if (!/^\S+@\S+\.\S+$/.test(email)) { showToast("Enter a valid email"); return; }
+        if (password.length < 8) { showToast("Password must be 8+ characters"); return; }
+
+        // NOTE: password is intentionally NOT stored anywhere. Once accounts
+        // are wired up to a real auth provider, this handler will POST to it.
+        submit.disabled = true;
+        submit.textContent = "Saving…";
+
+        // Simulate a tiny delay so it feels responsive
+        setTimeout(function() {
+          setAccount({ username: username, email: email, joinedAt: Date.now() });
+          submit.disabled = false;
+          submit.textContent = "Create account";
+          form.reset();
+          showToast("You're on the list! We'll email you when accounts go live.");
+          renderAccountState();
+        }, 350);
+      });
+
+      signoutBtn.addEventListener("click", function() {
+        clearAccount();
+        renderAccountState();
+        showToast("Removed from the list.");
+      });
+
+      // Initial render in case the user reopens the page
+      renderAccountState();
+    })();
 
   </script>
 </body>
