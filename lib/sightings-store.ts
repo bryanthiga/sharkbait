@@ -2,6 +2,7 @@ import { scanForSightings } from "./scanner";
 import { getConfidenceLabel, scoreSightings } from "./scorer";
 import { Sighting } from "./types";
 import { isRelatedMarine } from "./species";
+import { milesBetween } from "./geo";
 
 interface CacheEntry {
   sightings: Sighting[];
@@ -42,23 +43,36 @@ export interface FilterOptions {
   days?: number;
   limit?: number;
   includeRelated?: boolean;
+  near?: { lat: number; lon: number; radiusMiles: number };
 }
+
+export type SightingWithDistance = Sighting & { distanceMiles?: number };
 
 export function applyFilters(
   sightings: Sighting[],
   opts: FilterOptions = {},
-): Sighting[] {
+): SightingWithDistance[] {
   const days = opts.days ?? 30;
   const limit = opts.limit ?? 200;
   const includeRelated = opts.includeRelated ?? false;
   const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
 
-  return sightings
+  let filtered: SightingWithDistance[] = sightings
     .filter((s) => {
       const t = Date.parse(s.date);
       return !isNaN(t) && t >= cutoff;
     })
-    .filter((s) => includeRelated || !isRelatedMarine(s.species))
+    .filter((s) => includeRelated || !isRelatedMarine(s.species));
+
+  if (opts.near) {
+    const center = { lat: opts.near.lat, lon: opts.near.lon };
+    const radius = opts.near.radiusMiles;
+    filtered = filtered
+      .map((s) => ({ ...s, distanceMiles: milesBetween(center, s) }))
+      .filter((s) => (s.distanceMiles as number) <= radius);
+  }
+
+  return filtered
     .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
     .slice(0, limit);
 }

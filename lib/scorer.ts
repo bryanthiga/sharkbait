@@ -14,7 +14,15 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { Sighting } from "./types";
+import { ConfidenceLabel, Sighting } from "./types";
+
+export function getConfidenceLabel(score?: number): ConfidenceLabel {
+  if (score == null) return "Unconfirmed";
+  if (score >= 75) return "Verified";
+  if (score >= 55) return "Likely";
+  if (score >= 35) return "Unconfirmed";
+  return "Low confidence";
+}
 
 // Haiku is plenty for credibility scoring and ~4x faster than Opus, which
 // matters because this runs on the request path that gates first paint.

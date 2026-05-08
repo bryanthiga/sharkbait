@@ -659,6 +659,83 @@
     .health-unconfirmed { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
     .health-low { background: rgba(239,68,68,0.08); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
 
+    /* ── Surf spot picker ──────────────────────────── */
+    .surf-picker {
+      position: absolute;
+      top: 70px;
+      left: 14px;
+      right: 70px;
+      max-width: 360px;
+      z-index: 35;
+    }
+    @media (min-width: 768px) {
+      .surf-picker { top: 14px; left: 220px; right: auto; width: 360px; }
+    }
+    .surf-picker-row { display: flex; gap: 8px; align-items: center; }
+    .surf-picker-input {
+      width: 100%; min-height: 40px;
+      border: 1px solid rgba(45,212,191,0.22);
+      border-radius: 14px;
+      background: rgba(2,6,23,0.82); color: #f8fafc;
+      padding: 0 14px; font: inherit; font-size: 13px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+    .surf-picker-input::placeholder { color: rgba(226,232,240,0.55); }
+    .surf-picker-input:focus {
+      outline: none;
+      border-color: rgba(94,234,212,0.75);
+      box-shadow: 0 0 0 3px rgba(45,212,191,0.12), 0 8px 32px rgba(0,0,0,0.35);
+    }
+    .surf-picker-clear {
+      min-height: 40px;
+      border: 1px solid rgba(45,212,191,0.18);
+      border-radius: 14px;
+      background: rgba(15,23,42,0.85); color: #5eead4;
+      padding: 0 12px; font: inherit; font-size: 12px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .surf-picker-clear:hover { background: rgba(45,212,191,0.12); }
+    .surf-picker-menu {
+      position: absolute; top: calc(100% + 8px); left: 0; right: 0;
+      max-height: 320px; overflow: auto;
+      border: 1px solid rgba(45,212,191,0.18);
+      border-radius: 14px;
+      background: rgba(2,6,23,0.96);
+      box-shadow: 0 18px 48px rgba(0,0,0,0.55);
+      backdrop-filter: blur(22px);
+      -webkit-backdrop-filter: blur(22px);
+    }
+    .surf-picker-menu.hidden { display: none; }
+    .surf-picker-option {
+      display: flex; flex-direction: column; gap: 2px;
+      width: 100%; border: 0;
+      border-bottom: 1px solid rgba(148,163,184,0.08);
+      background: transparent; color: #f8fafc;
+      padding: 10px 13px; text-align: left; cursor: pointer;
+      font: inherit;
+    }
+    .surf-picker-option:last-child { border-bottom: 0; }
+    .surf-picker-option:hover, .surf-picker-option:focus { background: rgba(45,212,191,0.1); outline: none; }
+    .surf-picker-name { font-size: 13px; font-weight: 700; }
+    .surf-picker-meta { font-size: 11px; color: rgba(203,213,225,0.66); }
+    .surf-picker-empty { padding: 14px; color: rgba(203,213,225,0.7); font-size: 13px; }
+
+    /* Nearby activity banner inside sidebar */
+    .nearby-banner {
+      display: none; padding: 10px 14px;
+      margin: 10px 14px 0;
+      border: 1px solid rgba(45,212,191,0.22);
+      border-radius: 12px;
+      background: rgba(45,212,191,0.06);
+      flex-shrink: 0;
+    }
+    .nearby-banner.active { display: block; }
+    .nearby-title { font-size: 13px; font-weight: 700; color: #5eead4; }
+    .nearby-sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+    .nearby-line { font-size: 11px; color: #cbd5e1; margin-top: 4px; }
+
     .card-species {
       display: inline-flex; align-items: center; gap: 5px;
       font-size: 10px; color: #5eead4; margin-top: 4px;
@@ -732,6 +809,21 @@
         </div>
         <div class="loading-text">Scanning for shark sightings<span class="loading-dots"></span></div>
       </div>
+
+      <div class="surf-picker" id="surf-picker">
+        <div class="surf-picker-row">
+          <input
+            type="text"
+            id="surf-picker-input"
+            class="surf-picker-input"
+            placeholder="Search surf spots…"
+            aria-label="Search surf spots"
+            autocomplete="off"
+          >
+          <button type="button" class="surf-picker-clear" id="surf-picker-clear" hidden>Clear</button>
+        </div>
+        <div class="surf-picker-menu hidden" id="surf-picker-menu" role="listbox"></div>
+      </div>
     </div>
 
     <div class="resize-handle" id="resize-handle"><div class="grip"></div></div>
@@ -742,6 +834,11 @@
         <div class="stat stat-attack" data-filter="Attack"><div class="stat-icon">🩸</div><div class="stat-num" id="stat-attack">0</div><div class="stat-label">Attacks</div></div>
         <div class="stat stat-warning" data-filter="Warning"><div class="stat-icon">⚠️</div><div class="stat-num" id="stat-warning">0</div><div class="stat-label">Warnings</div></div>
         <div class="stat stat-sighting" data-filter="Sighting"><div class="stat-icon">👁️</div><div class="stat-num" id="stat-sighting">0</div><div class="stat-label">Sightings</div></div>
+      </div>
+      <div class="nearby-banner" id="nearby-banner">
+        <div class="nearby-title" id="nearby-title"></div>
+        <div class="nearby-sub" id="nearby-sub"></div>
+        <div class="nearby-line" id="nearby-closest"></div>
       </div>
 
       <div class="species-section">
@@ -1219,9 +1316,166 @@
     }
 
     var lastFetchedAt = null;
+    var selectedSurfSpot = null;
+
+    // ── Surf spots (mirror of lib/surf-spots.ts; client-side only needs name/region/country/lat/lon/aliases/slug) ──
+    var SURF_SPOTS = [
+      { slug:"huntington-beach-pier", name:"Huntington Beach Pier", region:"California", country:"United States", lat:33.6543, lon:-118.0030, aliases:["hb pier","surf city","huntington beach"] },
+      { slug:"trestles", name:"Trestles", region:"California", country:"United States", lat:33.3847, lon:-117.5936, aliases:["lowers","lower trestles","san onofre"] },
+      { slug:"malibu-first-point", name:"Malibu First Point", region:"California", country:"United States", lat:34.0350, lon:-118.6774, aliases:["malibu","surfrider beach"] },
+      { slug:"pipeline", name:"Pipeline", region:"Oahu", country:"United States", lat:21.6657, lon:-158.0521, aliases:["banzai pipeline","ehukai beach"] },
+      { slug:"waimea-bay", name:"Waimea Bay", region:"Oahu", country:"United States", lat:21.6408, lon:-158.0643 },
+      { slug:"mavericks", name:"Mavericks", region:"California", country:"United States", lat:37.4942, lon:-122.5000 },
+      { slug:"steamer-lane", name:"Steamer Lane", region:"California", country:"United States", lat:36.9516, lon:-122.0263 },
+      { slug:"pleasure-point", name:"Pleasure Point", region:"California", country:"United States", lat:36.9563, lon:-121.9696 },
+      { slug:"ocean-beach-san-francisco", name:"Ocean Beach", region:"California", country:"United States", lat:37.7594, lon:-122.5107, aliases:["ocean beach sf","ob sf"] },
+      { slug:"newport-beach-56th-street", name:"Newport Beach 56th Street", region:"California", country:"United States", lat:33.6313, lon:-117.9533 },
+      { slug:"blacks-beach", name:"Blacks Beach", region:"California", country:"United States", lat:32.8898, lon:-117.2533 },
+      { slug:"la-jolla-shores", name:"La Jolla Shores", region:"California", country:"United States", lat:32.8570, lon:-117.2560 },
+      { slug:"cocoa-beach-pier", name:"Cocoa Beach Pier", region:"Florida", country:"United States", lat:28.3670, lon:-80.6023 },
+      { slug:"new-smyrna-beach", name:"New Smyrna Beach", region:"Florida", country:"United States", lat:29.0258, lon:-80.9262 },
+      { slug:"sebastian-inlet", name:"Sebastian Inlet", region:"Florida", country:"United States", lat:27.8606, lon:-80.4456 },
+      { slug:"wrightsville-beach", name:"Wrightsville Beach", region:"North Carolina", country:"United States", lat:34.2085, lon:-77.7964 },
+      { slug:"cape-hatteras-lighthouse", name:"Cape Hatteras Lighthouse", region:"North Carolina", country:"United States", lat:35.2505, lon:-75.5280 },
+      { slug:"montauk", name:"Montauk", region:"New York", country:"United States", lat:41.0359, lon:-71.9545 },
+      { slug:"rincon-puerto-rico", name:"Rincon", region:"Puerto Rico", country:"United States", lat:18.3402, lon:-67.2509 },
+      { slug:"tofinino-cox-bay", name:"Cox Bay", region:"British Columbia", country:"Canada", lat:49.1012, lon:-125.8725, aliases:["tofino","cox bay tofino"] },
+      { slug:"bondi-beach", name:"Bondi Beach", region:"New South Wales", country:"Australia", lat:-33.8915, lon:151.2767 },
+      { slug:"bells-beach", name:"Bells Beach", region:"Victoria", country:"Australia", lat:-38.3692, lon:144.2836 },
+      { slug:"snapper-rocks", name:"Snapper Rocks", region:"Queensland", country:"Australia", lat:-28.1646, lon:153.5502 },
+      { slug:"burleigh-heads", name:"Burleigh Heads", region:"Queensland", country:"Australia", lat:-28.0918, lon:153.4593 },
+      { slug:"margaret-river-main-break", name:"Margaret River Main Break", region:"Western Australia", country:"Australia", lat:-33.9765, lon:114.9878 },
+      { slug:"raglan-manu-bay", name:"Raglan Manu Bay", region:"Waikato", country:"New Zealand", lat:-37.8112, lon:174.8155, aliases:["manu bay","raglan"] },
+      { slug:"jeffreys-bay", name:"Jeffreys Bay", region:"Eastern Cape", country:"South Africa", lat:-34.0507, lon:24.9210, aliases:["j-bay","supertubes"] },
+      { slug:"dungeons", name:"Dungeons", region:"Western Cape", country:"South Africa", lat:-34.0572, lon:18.3336 },
+      { slug:"hossegor-la-graviere", name:"Hossegor La Graviere", region:"Nouvelle-Aquitaine", country:"France", lat:43.6655, lon:-1.4428 },
+      { slug:"mundaka", name:"Mundaka", region:"Basque Country", country:"Spain", lat:43.4074, lon:-2.6981 },
+      { slug:"nazare", name:"Nazare", region:"Leiria", country:"Portugal", lat:39.6057, lon:-9.0764 },
+      { slug:"ericeira-ribeira-dilhas", name:"Ribeira d'Ilhas", region:"Ericeira", country:"Portugal", lat:39.0057, lon:-9.4202 },
+      { slug:"uluwatu", name:"Uluwatu", region:"Bali", country:"Indonesia", lat:-8.8150, lon:115.0870 },
+      { slug:"padang-padang", name:"Padang Padang", region:"Bali", country:"Indonesia", lat:-8.8106, lon:115.1037 },
+      { slug:"cloudbreak", name:"Cloudbreak", region:"Mamanuca Islands", country:"Fiji", lat:-17.8569, lon:177.1824 },
+      { slug:"teahupoo", name:"Teahupoo", region:"Tahiti", country:"French Polynesia", lat:-17.8494, lon:-149.2676 },
+      { slug:"puerto-escondido-zicatela", name:"Puerto Escondido Zicatela", region:"Oaxaca", country:"Mexico", lat:15.8527, lon:-97.0516, aliases:["zicatela","puerto escondido"] },
+      { slug:"punta-de-lobos", name:"Punta de Lobos", region:"O'Higgins", country:"Chile", lat:-34.4254, lon:-72.0496 }
+    ];
+
+    function searchSurfSpots(query) {
+      var q = (query || "").trim().toLowerCase();
+      if (!q) return SURF_SPOTS;
+      return SURF_SPOTS.filter(function(spot) {
+        var hay = [spot.name, spot.region, spot.country, spot.slug]
+          .concat(spot.aliases || []).join(" ").toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+    }
+
+    // ── Surf spot picker ─────────────────────────
+    (function() {
+      var input = document.getElementById("surf-picker-input");
+      var menu  = document.getElementById("surf-picker-menu");
+      var clearBtn = document.getElementById("surf-picker-clear");
+      var picker = document.getElementById("surf-picker");
+      if (!input || !menu) return;
+
+      function renderMenu(query) {
+        var results = searchSurfSpots(query).slice(0, 12);
+        if (!results.length) {
+          menu.innerHTML = '<div class="surf-picker-empty">No surf spots found</div>';
+          return;
+        }
+        menu.innerHTML = results.map(function(spot) {
+          return '<button type="button" class="surf-picker-option" role="option" data-slug="' + spot.slug + '">' +
+            '<span class="surf-picker-name">' + escapeHtml(spot.name) + '</span>' +
+            '<span class="surf-picker-meta">' + escapeHtml(spot.region) + ', ' + escapeHtml(spot.country) + '</span>' +
+            '</button>';
+        }).join("");
+      }
+
+      function openMenu() {
+        renderMenu(input.value);
+        menu.classList.remove("hidden");
+      }
+      function closeMenu() { menu.classList.add("hidden"); }
+
+      input.addEventListener("focus", openMenu);
+      input.addEventListener("input", function() { openMenu(); });
+
+      menu.addEventListener("mousedown", function(e) {
+        var btn = e.target.closest(".surf-picker-option");
+        if (!btn) return;
+        e.preventDefault();
+        var slug = btn.getAttribute("data-slug");
+        var spot = SURF_SPOTS.find(function(s) { return s.slug === slug; });
+        if (spot) selectSurfSpot(spot);
+      });
+
+      document.addEventListener("mousedown", function(e) {
+        if (!picker.contains(e.target)) closeMenu();
+      });
+      input.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") { closeMenu(); input.blur(); }
+      });
+
+      clearBtn.addEventListener("click", clearSurfSpot);
+
+      window.__selectSurfSpot = selectSurfSpot;
+      window.__clearSurfSpot  = clearSurfSpot;
+
+      function selectSurfSpot(spot) {
+        selectedSurfSpot = spot;
+        input.value = spot.name;
+        clearBtn.hidden = false;
+        closeMenu();
+
+        try {
+          map.flyTo({ center: [spot.lon, spot.lat], zoom: 10, duration: 1200 });
+        } catch (err) { /* map not ready yet */ }
+
+        if (window.__snapBottomSheet) window.__snapBottomSheet("half");
+
+        fetchSightings(false, spot);
+      }
+
+      function clearSurfSpot() {
+        selectedSurfSpot = null;
+        input.value = "";
+        clearBtn.hidden = true;
+        closeMenu();
+        updateNearbyBanner(null);
+        fetchSightings(false, null);
+      }
+    })();
+
+    function updateNearbyBanner(spot) {
+      var banner = document.getElementById("nearby-banner");
+      if (!banner) return;
+      if (!spot) {
+        banner.classList.remove("active");
+        return;
+      }
+
+      var titleEl = document.getElementById("nearby-title");
+      var subEl = document.getElementById("nearby-sub");
+      var closestEl = document.getElementById("nearby-closest");
+
+      titleEl.textContent = spot.name;
+      var withDist = (allSightings || []).filter(function(s) { return typeof s.distanceMiles === "number"; });
+      subEl.textContent = withDist.length + " nearby report" + (withDist.length === 1 ? "" : "s");
+
+      if (withDist.length) {
+        var closest = withDist.slice().sort(function(a, b) { return a.distanceMiles - b.distanceMiles; })[0];
+        var miles = closest.distanceMiles.toFixed(1);
+        var label = closest.species && closest.species !== "Unknown" ? closest.species : closest.type;
+        closestEl.textContent = "Closest: " + label + ", " + miles + " mi away";
+      } else {
+        closestEl.textContent = "No reports within range right now.";
+      }
+      banner.classList.add("active");
+    }
 
     // ── Fetch ────────────────────────────────────
-    function fetchSightings(silent) {
+    function fetchSightings(silent, spotOverride) {
       var btn = document.getElementById("refresh-btn");
       btn.disabled = true;
       if (!silent) {
@@ -1229,7 +1483,11 @@
         document.getElementById("loading").classList.remove("hidden");
       }
 
-      fetch("/api/sightings?t=" + Date.now())
+      var spot = spotOverride === undefined ? selectedSurfSpot : spotOverride;
+      var qs = "t=" + Date.now();
+      if (spot) qs += "&spot=" + encodeURIComponent(spot.slug);
+
+      fetch("/api/sightings?" + qs)
         .then(function(r) {
           if (!r.ok) throw new Error("Server returned " + r.status);
           return r.json();
@@ -1240,6 +1498,7 @@
           allSightings = rows;
           render();
           updateLastRefreshed();
+          updateNearbyBanner(spot || null);
         })
         .catch(function(err) {
           console.error("Fetch failed:", err);
@@ -1343,6 +1602,9 @@
         snapTo("peek", false);
         requestAnimationFrame(function() { sidebar.style.transition = ""; });
       });
+
+      // Expose for surf-spot picker so a selection can pop the sheet to half
+      window.__snapBottomSheet = function(s) { snapTo(s, true); map.resize(); };
 
       // Drag logic — works on both handle AND the feed (when at top of scroll)
       function startDrag(clientY) {
