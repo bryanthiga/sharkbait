@@ -662,13 +662,13 @@
     /* ── Surf spot picker (compact utility, not hero) ── */
     .surf-picker {
       position: absolute;
-      top: 64px;
-      right: 14px;
-      width: 200px;
+      top: 140px;
+      left: 12px;
+      width: 110px;
       z-index: 35;
     }
     @media (min-width: 768px) {
-      .surf-picker { top: 14px; right: 70px; width: 220px; }
+      .surf-picker { top: 148px; left: 14px; width: 120px; }
     }
     .surf-picker-row { display: flex; gap: 6px; align-items: center; }
     .surf-picker-input {
@@ -698,7 +698,7 @@
     }
     .surf-picker-clear:hover { background: rgba(45,212,191,0.12); }
     .surf-picker-menu {
-      position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+      position: absolute; top: 36px; left: 0; right: 0;
       max-height: 300px; overflow: auto;
       border: 1px solid rgba(45,212,191,0.18);
       border-radius: 12px;
@@ -706,6 +706,7 @@
       box-shadow: 0 12px 32px rgba(0,0,0,0.5);
       backdrop-filter: blur(18px);
       -webkit-backdrop-filter: blur(18px);
+      z-index: 2;
     }
     .surf-picker-menu.hidden { display: none; }
     .surf-picker-option {
@@ -721,6 +722,33 @@
     .surf-picker-name { font-size: 11px; font-weight: 600; }
     .surf-picker-meta { font-size: 10px; color: rgba(203,213,225,0.6); }
     .surf-picker-empty { padding: 10px; color: rgba(203,213,225,0.7); font-size: 11px; }
+    .surf-picker-error { padding: 8px 12px; color: #fca5a5; font-size: 10px; margin-top: 6px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 999px; }
+    .surf-picker-error.hidden { display: none; }
+    .surf-picker-radius {
+      display: none; align-items: center; gap: 8px;
+      margin-top: 6px; padding: 4px 12px; height: 28px;
+      background: rgba(2,6,23,0.6);
+      border: 1px solid rgba(45,212,191,0.18);
+      border-radius: 999px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .surf-picker-radius.active { display: flex; }
+    .surf-picker-radius input[type="range"] {
+      flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+      background: rgba(45,212,191,0.2); border-radius: 2px; outline: none;
+    }
+    .surf-picker-radius input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #5eead4; cursor: pointer;
+    }
+    .surf-picker-radius input[type="range"]::-moz-range-thumb {
+      width: 12px; height: 12px; border-radius: 50%;
+      background: #5eead4; cursor: pointer; border: 0;
+    }
+    .surf-picker-radius-label { font-size: 10px; color: #94a3b8; min-width: 40px; text-align: right; }
+    .card-distance { font-size: 10px; color: #5eead4; margin-left: 6px; }
 
     /* Nearby activity banner inside sidebar */
     .nearby-banner {
@@ -816,13 +844,18 @@
             type="text"
             id="surf-picker-input"
             class="surf-picker-input"
-            placeholder="Find a surf spot"
-            aria-label="Search surf spots"
+            placeholder="Surf spot, ZIP, or place"
+            aria-label="Search location"
             autocomplete="off"
           >
           <button type="button" class="surf-picker-clear" id="surf-picker-clear" hidden>Clear</button>
         </div>
         <div class="surf-picker-menu hidden" id="surf-picker-menu" role="listbox"></div>
+        <div class="surf-picker-radius" id="surf-picker-radius-wrap">
+          <input type="range" min="10" max="100" step="10" value="100" id="surf-picker-radius" aria-label="Search radius (miles)">
+          <span class="surf-picker-radius-label" id="surf-picker-radius-label">100 mi</span>
+        </div>
+        <div class="surf-picker-error hidden" id="surf-picker-error"></div>
       </div>
     </div>
 
@@ -1207,8 +1240,14 @@
       var feed = document.getElementById("feed");
       var sightings = getFiltered();
       if (sightings.length === 0) {
-        var rangeLabels = { all: "", today: " today", "7d": " this week", "30d": " this month" };
-        feed.innerHTML = '<div class="empty">No sightings found' + (rangeLabels[currentTimeRange] || "") + '</div>';
+        var emptyMsg;
+        if (activeLocation) {
+          emptyMsg = "No shark activity within " + activeLocation.radiusMiles + " mi of " + escapeHtml(activeLocation.name);
+        } else {
+          var rangeLabels = { all: "", today: " today", "7d": " this week", "30d": " this month" };
+          emptyMsg = "No sightings found" + (rangeLabels[currentTimeRange] || "");
+        }
+        feed.innerHTML = '<div class="empty">' + emptyMsg + '</div>';
         return;
       }
       var html = "";
@@ -1230,7 +1269,10 @@
           html += '<div class="card-species">' + getSharkIcon(s.species) + ' ' + escapeHtml(s.species) + '</div>';
         }
 
-        html += '<div class="card-location">📍 ' + escapeHtml(s.location) + '</div>';
+        var distHtml = (typeof s.distanceMiles === "number")
+          ? '<span class="card-distance">📏 ' + s.distanceMiles.toFixed(1) + ' mi away</span>'
+          : '';
+        html += '<div class="card-location">📍 ' + escapeHtml(s.location) + distHtml + '</div>';
         html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span><a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener">Read →</a></div>';
         html += '</div>';
       }
@@ -1316,7 +1358,11 @@
     }
 
     var lastFetchedAt = null;
-    var selectedSurfSpot = null;
+    // Unified location state. Shape: { kind:"spot"|"freeform", name, lat, lon, radiusMiles, slug? }
+    var activeLocation = null;
+    var searchedLocationMarker = null;
+    var geocodeCache = {};
+    var MAPBOX_GEOCODE_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/";
 
     // ── Surf spots (mirror of lib/surf-spots.ts; client-side only needs name/region/country/lat/lon/aliases/slug) ──
     var SURF_SPOTS = [
@@ -1370,18 +1416,72 @@
       });
     }
 
-    // ── Surf spot picker ─────────────────────────
+    // ── Mapbox geocoding (browser-side, cached in-memory) ──
+    function geocodeViaMapbox(query) {
+      var q = (query || "").trim();
+      if (!q) return Promise.resolve(null);
+      var key = q.toLowerCase();
+      if (geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
+      var url = MAPBOX_GEOCODE_URL + encodeURIComponent(q) + ".json?limit=1&access_token=" + TOKEN;
+      return fetch(url)
+        .then(function(r) {
+          if (!r.ok) throw new Error("Geocoder returned " + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          var feat = (data.features || [])[0];
+          if (!feat || !feat.center) return null;
+          var result = { name: feat.place_name || q, lat: feat.center[1], lon: feat.center[0] };
+          geocodeCache[key] = result;
+          return result;
+        });
+    }
+
+    function placeSearchMarker(lat, lon) {
+      if (searchedLocationMarker) searchedLocationMarker.remove();
+      var el = document.createElement("div");
+      el.style.cssText = "width:18px;height:18px;border-radius:50%;background:#5eead4;border:3px solid rgba(2,6,23,0.95);box-shadow:0 0 0 2px rgba(94,234,212,0.45),0 4px 12px rgba(0,0,0,0.4);";
+      searchedLocationMarker = new mapboxgl.Marker({ element: el })
+        .setLngLat([lon, lat])
+        .addTo(map);
+    }
+    function clearSearchMarker() {
+      if (searchedLocationMarker) { searchedLocationMarker.remove(); searchedLocationMarker = null; }
+    }
+
+    // ── Location picker (surf spots + free-form ZIP/city/state/country) ──
     (function() {
       var input = document.getElementById("surf-picker-input");
       var menu  = document.getElementById("surf-picker-menu");
       var clearBtn = document.getElementById("surf-picker-clear");
       var picker = document.getElementById("surf-picker");
+      var radiusWrap = document.getElementById("surf-picker-radius-wrap");
+      var radiusInput = document.getElementById("surf-picker-radius");
+      var radiusLabel = document.getElementById("surf-picker-radius-label");
+      var errorEl = document.getElementById("surf-picker-error");
       if (!input || !menu) return;
+
+      function showError(msg) {
+        if (!errorEl) return;
+        errorEl.textContent = msg;
+        errorEl.classList.remove("hidden");
+        clearTimeout(showError._t);
+        showError._t = setTimeout(function() { errorEl.classList.add("hidden"); }, 3500);
+      }
+
+      function setRadiusUI(miles) {
+        radiusInput.value = miles;
+        radiusLabel.textContent = miles + " mi";
+      }
+
+      function showRadiusSlider(show) {
+        radiusWrap.classList.toggle("active", !!show);
+      }
 
       function renderMenu(query) {
         var results = searchSurfSpots(query).slice(0, 12);
         if (!results.length) {
-          menu.innerHTML = '<div class="surf-picker-empty">No surf spots found</div>';
+          menu.innerHTML = '<div class="surf-picker-empty">No surf spots — press Enter to search any place</div>';
           return;
         }
         menu.innerHTML = results.map(function(spot) {
@@ -1392,14 +1492,11 @@
         }).join("");
       }
 
-      function openMenu() {
-        renderMenu(input.value);
-        menu.classList.remove("hidden");
-      }
+      function openMenu() { renderMenu(input.value); menu.classList.remove("hidden"); }
       function closeMenu() { menu.classList.add("hidden"); }
 
       input.addEventListener("focus", openMenu);
-      input.addEventListener("input", function() { openMenu(); });
+      input.addEventListener("input", openMenu);
 
       menu.addEventListener("mousedown", function(e) {
         var btn = e.target.closest(".surf-picker-option");
@@ -1414,54 +1511,113 @@
         if (!picker.contains(e.target)) closeMenu();
       });
       input.addEventListener("keydown", function(e) {
-        if (e.key === "Escape") { closeMenu(); input.blur(); }
+        if (e.key === "Escape") { closeMenu(); input.blur(); return; }
+        if (e.key === "Enter") {
+          e.preventDefault();
+          var q = input.value.trim();
+          if (!q) return;
+          closeMenu();
+          input.blur();
+          submitFreeform(q);
+        }
       });
 
-      clearBtn.addEventListener("click", clearSurfSpot);
+      radiusInput.addEventListener("input", function() {
+        radiusLabel.textContent = radiusInput.value + " mi";
+      });
+      radiusInput.addEventListener("change", function() {
+        if (!activeLocation) return;
+        activeLocation.radiusMiles = parseInt(radiusInput.value, 10) || 100;
+        fetchSightings(false);
+      });
+
+      clearBtn.addEventListener("click", clearLocation);
 
       window.__selectSurfSpot = selectSurfSpot;
-      window.__clearSurfSpot  = clearSurfSpot;
+      window.__clearSurfSpot  = clearLocation;
 
       function selectSurfSpot(spot) {
-        selectedSurfSpot = spot;
+        activeLocation = {
+          kind: "spot",
+          slug: spot.slug,
+          name: spot.name,
+          lat: spot.lat,
+          lon: spot.lon,
+          radiusMiles: 25,
+        };
         input.value = spot.name;
         clearBtn.hidden = false;
         closeMenu();
+        setRadiusUI(activeLocation.radiusMiles);
+        showRadiusSlider(true);
 
-        try {
-          map.flyTo({ center: [spot.lon, spot.lat], zoom: 10, duration: 1200 });
-        } catch (err) { /* map not ready yet */ }
+        try { map.flyTo({ center: [spot.lon, spot.lat], zoom: 10, duration: 1200 }); }
+        catch (err) { /* map not ready */ }
+        placeSearchMarker(spot.lat, spot.lon);
 
         if (window.__snapBottomSheet) window.__snapBottomSheet("half");
-
-        fetchSightings(false, spot);
+        fetchSightings(false);
       }
 
-      function clearSurfSpot() {
-        selectedSurfSpot = null;
+      function submitFreeform(query) {
+        input.placeholder = "Searching…";
+        geocodeViaMapbox(query)
+          .then(function(result) {
+            input.placeholder = "Surf spot, ZIP, or place";
+            if (!result) {
+              showError("Couldn't find that location. Try a ZIP, city/state, or country.");
+              return;
+            }
+            activeLocation = {
+              kind: "freeform",
+              name: result.name,
+              lat: result.lat,
+              lon: result.lon,
+              radiusMiles: 100,
+            };
+            input.value = result.name.split(",").slice(0, 2).join(",");
+            clearBtn.hidden = false;
+            setRadiusUI(activeLocation.radiusMiles);
+            showRadiusSlider(true);
+
+            try { map.flyTo({ center: [result.lon, result.lat], zoom: 8, duration: 1200 }); }
+            catch (err) { /* map not ready */ }
+            placeSearchMarker(result.lat, result.lon);
+
+            if (window.__snapBottomSheet) window.__snapBottomSheet("half");
+            fetchSightings(false);
+          })
+          .catch(function(err) {
+            input.placeholder = "Surf spot, ZIP, or place";
+            console.error("Geocode failed:", err);
+            showError("Search failed. Please try again.");
+          });
+      }
+
+      function clearLocation() {
+        activeLocation = null;
         input.value = "";
         clearBtn.hidden = true;
         closeMenu();
+        showRadiusSlider(false);
+        clearSearchMarker();
         updateNearbyBanner(null);
-        fetchSightings(false, null);
+        fetchSightings(false);
       }
     })();
 
-    function updateNearbyBanner(spot) {
+    function updateNearbyBanner(loc) {
       var banner = document.getElementById("nearby-banner");
       if (!banner) return;
-      if (!spot) {
-        banner.classList.remove("active");
-        return;
-      }
+      if (!loc) { banner.classList.remove("active"); return; }
 
       var titleEl = document.getElementById("nearby-title");
       var subEl = document.getElementById("nearby-sub");
       var closestEl = document.getElementById("nearby-closest");
 
-      titleEl.textContent = spot.name;
+      titleEl.textContent = loc.name;
       var withDist = (allSightings || []).filter(function(s) { return typeof s.distanceMiles === "number"; });
-      subEl.textContent = withDist.length + " nearby report" + (withDist.length === 1 ? "" : "s");
+      subEl.textContent = withDist.length + " nearby report" + (withDist.length === 1 ? "" : "s") + " within " + loc.radiusMiles + " mi";
 
       if (withDist.length) {
         var closest = withDist.slice().sort(function(a, b) { return a.distanceMiles - b.distanceMiles; })[0];
@@ -1475,7 +1631,7 @@
     }
 
     // ── Fetch ────────────────────────────────────
-    function fetchSightings(silent, spotOverride) {
+    function fetchSightings(silent) {
       var btn = document.getElementById("refresh-btn");
       btn.disabled = true;
       if (!silent) {
@@ -1483,9 +1639,15 @@
         document.getElementById("loading").classList.remove("hidden");
       }
 
-      var spot = spotOverride === undefined ? selectedSurfSpot : spotOverride;
       var qs = "t=" + Date.now();
-      if (spot) qs += "&spot=" + encodeURIComponent(spot.slug);
+      var loc = activeLocation;
+      if (loc) {
+        if (loc.kind === "spot" && loc.slug) {
+          qs += "&spot=" + encodeURIComponent(loc.slug) + "&radius=" + encodeURIComponent(loc.radiusMiles);
+        } else {
+          qs += "&lat=" + encodeURIComponent(loc.lat) + "&lon=" + encodeURIComponent(loc.lon) + "&radius=" + encodeURIComponent(loc.radiusMiles);
+        }
+      }
 
       fetch("/api/sightings?" + qs)
         .then(function(r) {
@@ -1498,7 +1660,7 @@
           allSightings = rows;
           render();
           updateLastRefreshed();
-          updateNearbyBanner(spot || null);
+          updateNearbyBanner(loc || null);
         })
         .catch(function(err) {
           console.error("Fetch failed:", err);
