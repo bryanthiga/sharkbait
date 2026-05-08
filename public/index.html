@@ -15,10 +15,12 @@
   <meta property="og:title" content="Sharkbait — Live Shark Tracker">
   <meta property="og:description" content="Track shark sightings worldwide in real time. See attacks, warnings, and encounters on a live map.">
   <meta property="og:type" content="website">
-  <meta property="og:image" content="/shark-mascot.png">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:url" content="https://sharkbait.io/">
+  <meta property="og:image" content="https://sharkbait.io/sharkbait-og.png">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Sharkbait — Live Shark Tracker">
   <meta name="twitter:description" content="Track shark sightings worldwide in real time.">
+  <meta name="twitter:image" content="https://sharkbait.io/sharkbait-og.png">
   <link rel="dns-prefetch" href="https://api.mapbox.com">
   <link rel="preconnect" href="https://api.mapbox.com" crossorigin>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
@@ -653,6 +655,7 @@
     }
     .health-dot::before { content: ''; width: 5px; height: 5px; border-radius: 50%; display: inline-block; background: currentColor; }
     .health-verified { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+    .health-likely { background: rgba(45,212,191,0.1); color: #5eead4; border: 1px solid rgba(45,212,191,0.25); }
     .health-unconfirmed { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
     .health-low { background: rgba(239,68,68,0.08); color: #f87171; border: 1px solid rgba(239,68,68,0.2); }
 
@@ -712,6 +715,7 @@
   </style>
 </head>
 <body>
+  <h1 style="position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;">Sharkbait live shark sighting map</h1>
   <div class="app">
     <div class="map-wrap">
       <div id="map"></div>
@@ -1122,7 +1126,7 @@
         html += '<div class="card-header"><div class="card-title">' + escapeHtml(s.title) + '</div>';
         html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">';
         html += '<span class="badge ' + badgeClass + '">' + escapeHtml(s.type) + '</span>';
-        html += healthBadge(s.healthScore);
+        html += healthBadge(s.confidence, s.healthScore);
         html += '</div></div>';
 
         if (s.species && s.species !== "Unknown") {
@@ -1200,14 +1204,18 @@
       });
     });
 
-    // ── Health score badge helper ─────────────────
-    function healthBadge(score) {
-      if (score == null) return "";
-      var cls, label;
-      if (score >= 65) { cls = "health-verified"; label = "Verified"; }
-      else if (score >= 40) { cls = "health-unconfirmed"; label = "Unconfirmed"; }
-      else { cls = "health-low"; label = "Low confidence"; }
-      return '<span class="health-dot ' + cls + '" title="Credibility: ' + score + '/100">' + label + '</span>';
+    // ── Confidence badge helper ─────────────────
+    var CONFIDENCE_CLASS = {
+      "Verified": "health-verified",
+      "Likely": "health-likely",
+      "Unconfirmed": "health-unconfirmed",
+      "Low confidence": "health-low"
+    };
+    function healthBadge(label, score) {
+      if (!label) return "";
+      var cls = CONFIDENCE_CLASS[label] || "health-unconfirmed";
+      var title = score != null ? "Credibility: " + score + "/100" : label;
+      return '<span class="health-dot ' + cls + '" title="' + title + '">' + label + '</span>';
     }
 
     var lastFetchedAt = null;

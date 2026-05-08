@@ -1,42 +1,31 @@
-import { NextResponse } from "next/server";
-import { scanForSightings } from "@/lib/scanner";
-import { scoreSightings } from "@/lib/scorer";
-import { Sighting } from "@/lib/types";
-
-interface CacheEntry {
-  sightings: Sighting[];
-  fetchedAt: number;
-  fetchedAtIso: string;
-}
-
-let cache: CacheEntry | null = null;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-let fetchInProgress: Promise<Sighting[]> | null = null;
+import { NextRequest, NextResponse } from "next/server";
+import { getCachedSightings, applyFilters } from "@/lib/sightings-store";
 
 const CACHE_HEADERS = {
   "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
 };
 
-export async function GET() {
+function parseIntParam(
+  value: string | null,
+  fallback: number,
+  max: number,
+): number {
+  if (!value) return fallback;
+  const n = parseInt(value, 10);
+  if (isNaN(n) || n < 1) return fallback;
+  return Math.min(n, max);
+}
+
+export async function GET(req: NextRequest) {
   try {
-    if (cache && Date.now() - cache.fetchedAt < CACHE_TTL) {
-      return NextResponse.json(
-        { sightings: cache.sightings, fetchedAt: cache.fetchedAtIso },
-        { headers: CACHE_HEADERS },
-      );
-    }
+    const url = new URL(req.url);
+    const days = parseIntParam(url.searchParams.get("days"), 30, 365);
+    const limit = parseIntParam(url.searchParams.get("limit"), 200, 1000);
+    const includeRelated =
+      url.searchParams.get("includeRelated") === "true";
 
-    if (!fetchInProgress) {
-      fetchInProgress = (async () => {
-        const raw = await scanForSightings();
-        return await scoreSightings(raw);
-      })().finally(() => { fetchInProgress = null; });
-    }
-
-    const sightings = await fetchInProgress;
-    const fetchedAtIso = new Date().toISOString();
-    cache = { sightings, fetchedAt: Date.now(), fetchedAtIso };
+    const { sightings: all, fetchedAtIso } = await getCachedSightings();
+    const sightings = applyFilters(all, { days, limit, includeRelated });
 
     return NextResponse.json(
       { sightings, fetchedAt: fetchedAtIso },

@@ -2,4 +2,16 @@
   <url>
     <loc>https://sharkbait.io/</loc>
   </url>
+  <url>
+    <loc>https://sharkbait.io/sightings/california</loc>
+  </url>
+  <url>
+    <loc>https://sharkbait.io/sightings/florida</loc>
+  </url>
+  <url>
+    <loc>https://sharkbait.io/species/great-white</loc>
+  </url>
+  <url>
+    <loc>https://sharkbait.io/species/tiger-shark</loc>
+  </url>
 </urlset>
