@@ -365,11 +365,15 @@
       }
 
       /* Stats: slightly more compact on mobile */
-      .stats { padding: 8px 10px; gap: 6px; }
-      .stat { padding: 9px 4px 7px; border-radius: 14px; }
-      .stat-num { font-size: 20px; }
-      .stat-icon { font-size: 17px; }
-      .stat-label { font-size: 7px; }
+      .stats {
+        padding: 8px 8px;
+        gap: 4px;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .stat { padding: 9px 2px 7px; border-radius: 14px; min-width: 0; }
+      .stat-num { font-size: 18px; }
+      .stat-icon { font-size: 16px; }
+      .stat-label { font-size: 7px; letter-spacing: 0; }
 
       /* Species bar: only visible when sheet is half/full */
       .species-section {
@@ -666,9 +670,12 @@
       left: 12px;
       width: 110px;
       z-index: 35;
+      transition: width 0.18s ease;
     }
+    .surf-picker:has(.surf-picker-radius.active) { width: 170px; }
     @media (min-width: 768px) {
       .surf-picker { top: 196px; left: 14px; width: 120px; }
+      .surf-picker:has(.surf-picker-radius.active) { width: 200px; }
     }
     .surf-picker-row { display: flex; gap: 6px; align-items: center; }
     .surf-picker-input {
@@ -725,17 +732,21 @@
     .surf-picker-error { padding: 8px 12px; color: #fca5a5; font-size: 10px; margin-top: 6px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 999px; }
     .surf-picker-error.hidden { display: none; }
     .surf-picker-radius {
-      display: none; align-items: center; gap: 8px;
-      margin-top: 6px; padding: 4px 12px; height: 28px;
+      display: none; align-items: center; gap: 6px;
+      margin-top: 6px; padding: 4px 8px; height: 28px;
       background: rgba(2,6,23,0.6);
       border: 1px solid rgba(45,212,191,0.18);
       border-radius: 999px;
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
+      max-width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
     }
     .surf-picker-radius.active { display: flex; }
     .surf-picker-radius input[type="range"] {
-      flex: 1; height: 4px; -webkit-appearance: none; appearance: none;
+      flex: 1 1 0; min-width: 0; height: 4px;
+      -webkit-appearance: none; appearance: none;
       background: rgba(45,212,191,0.2); border-radius: 2px; outline: none;
     }
     .surf-picker-radius input[type="range"]::-webkit-slider-thumb {
@@ -747,7 +758,7 @@
       width: 12px; height: 12px; border-radius: 50%;
       background: #5eead4; cursor: pointer; border: 0;
     }
-    .surf-picker-radius-label { font-size: 10px; color: #94a3b8; min-width: 40px; text-align: right; }
+    .surf-picker-radius-label { font-size: 10px; color: #94a3b8; min-width: 30px; flex-shrink: 0; text-align: right; }
     .card-distance { font-size: 10px; color: #5eead4; margin-left: 6px; }
 
     .auto-focus-toggle {
