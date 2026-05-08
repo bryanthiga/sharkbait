@@ -1634,7 +1634,7 @@
           name: spot.name,
           lat: spot.lat,
           lon: spot.lon,
-          radiusMiles: 25,
+          radiusMiles: 100,
         };
         input.value = spot.name;
         clearBtn.hidden = false;
@@ -1654,7 +1654,7 @@
         input.placeholder = "Searching…";
         geocodeViaMapbox(query)
           .then(function(result) {
-            input.placeholder = "Surf spot, ZIP, or place";
+            input.placeholder = "Going surfing?";
             if (!result) {
               showError("Couldn't find that location. Try a ZIP, city/state, or country.");
               return;
@@ -1679,7 +1679,7 @@
             fetchSightings(false);
           })
           .catch(function(err) {
-            input.placeholder = "Surf spot, ZIP, or place";
+            input.placeholder = "Going surfing?";
             console.error("Geocode failed:", err);
             showError("Search failed. Please try again.");
           });
