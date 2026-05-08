@@ -750,6 +750,14 @@
     .surf-picker-radius-label { font-size: 10px; color: #94a3b8; min-width: 40px; text-align: right; }
     .card-distance { font-size: 10px; color: #5eead4; margin-left: 6px; }
 
+    .auto-focus-toggle {
+      display: block; margin: 8px auto 0; padding: 4px 12px;
+      font-size: 10px; color: #94a3b8;
+      background: transparent; border: 1px solid rgba(148,163,184,0.15);
+      border-radius: 999px; cursor: pointer; font: inherit;
+    }
+    .auto-focus-toggle:hover { color: #5eead4; border-color: rgba(45,212,191,0.3); }
+
     /* Nearby activity banner inside sidebar */
     .nearby-banner {
       display: none; padding: 10px 14px;
@@ -898,6 +906,7 @@
       <div class="refresh-bar">
         <div id="last-refreshed" style="text-align:center;font-size:10px;color:#475569;margin-bottom:5px;"></div>
         <button class="refresh-btn" id="refresh-btn" disabled>Scanning…</button>
+        <button type="button" class="auto-focus-toggle" id="auto-focus-toggle" aria-pressed="true" title="Open the map near your nearest beach">📍 Auto-focus: on</button>
       </div>
     </div>
   </div>
@@ -1135,8 +1144,28 @@
       }
       return best;
     }
+    var AUTO_FOCUS_KEY = "sharkbait:autoFocus";
+    function isAutoFocusEnabled() {
+      try { return localStorage.getItem(AUTO_FOCUS_KEY) !== "off"; }
+      catch (e) { return true; }
+    }
+    function setAutoFocusEnabled(on) {
+      try { localStorage.setItem(AUTO_FOCUS_KEY, on ? "on" : "off"); } catch (e) {}
+      var btn = document.getElementById("auto-focus-toggle");
+      if (btn) {
+        btn.textContent = "📍 Auto-focus: " + (on ? "on" : "off");
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
+    }
+    document.addEventListener("DOMContentLoaded", function() {
+      setAutoFocusEnabled(isAutoFocusEnabled());
+      var btn = document.getElementById("auto-focus-toggle");
+      if (btn) btn.addEventListener("click", function() { setAutoFocusEnabled(!isAutoFocusEnabled()); });
+    });
+
     function applyAutoCoastalFocus() {
       if (activeLocation) return;
+      if (!isAutoFocusEnabled()) return;
       fetch("/api/geo")
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(geo) {
