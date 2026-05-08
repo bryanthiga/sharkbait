@@ -662,13 +662,13 @@
     /* ── Surf spot picker (compact utility, not hero) ── */
     .surf-picker {
       position: absolute;
-      top: 236px;
+      top: 188px;
       left: 12px;
       width: 110px;
       z-index: 35;
     }
     @media (min-width: 768px) {
-      .surf-picker { top: 244px; left: 14px; width: 120px; }
+      .surf-picker { top: 196px; left: 14px; width: 120px; }
     }
     .surf-picker-row { display: flex; gap: 6px; align-items: center; }
     .surf-picker-input {
@@ -1096,7 +1096,58 @@
       map.on("mouseleave", "sightings-glow", function() { map.getCanvas().style.cursor = ""; });
 
       if (allSightings.length > 0) render();
+
+      applyAutoCoastalFocus();
     });
+
+    // ── Auto coastal focus (IP-derived, Vercel-side; only on first load, no user filter) ──
+    var COASTAL_FOCUS_POINTS = [
+      { name: "Santa Monica", lat: 34.0195, lon: -118.4912, zoom: 6 },
+      { name: "Huntington Beach", lat: 33.6595, lon: -117.9988, zoom: 7 },
+      { name: "San Diego", lat: 32.7157, lon: -117.1611, zoom: 7 },
+      { name: "San Francisco Ocean Beach", lat: 37.7594, lon: -122.5107, zoom: 7 },
+      { name: "New Smyrna Beach", lat: 29.0258, lon: -80.9262, zoom: 7 },
+      { name: "Miami Beach", lat: 25.7907, lon: -80.1300, zoom: 7 },
+      { name: "Cape Cod", lat: 41.6688, lon: -70.2962, zoom: 7 },
+      { name: "Outer Banks", lat: 35.5585, lon: -75.4665, zoom: 7 },
+      { name: "Galveston", lat: 29.3013, lon: -94.7977, zoom: 7 },
+      { name: "Honolulu", lat: 21.2760, lon: -157.8267, zoom: 8 },
+      { name: "Bondi Beach", lat: -33.8915, lon: 151.2767, zoom: 8 },
+      { name: "Cape Town", lat: -34.0572, lon: 18.3336, zoom: 7 },
+      { name: "Hossegor", lat: 43.6655, lon: -1.4428, zoom: 7 },
+      { name: "Raglan", lat: -37.8112, lon: 174.8155, zoom: 7 }
+    ];
+    function milesBetween(aLat, aLon, bLat, bLon) {
+      var R = 3958.8;
+      var toRad = function(x) { return x * Math.PI / 180; };
+      var dLat = toRad(bLat - aLat), dLon = toRad(bLon - aLon);
+      var lat1 = toRad(aLat), lat2 = toRad(bLat);
+      var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    }
+    function nearestCoastalAnchor(lat, lon) {
+      var best = null, bestDist = Infinity;
+      for (var i = 0; i < COASTAL_FOCUS_POINTS.length; i++) {
+        var p = COASTAL_FOCUS_POINTS[i];
+        var d = milesBetween(lat, lon, p.lat, p.lon);
+        if (d < bestDist) { bestDist = d; best = p; }
+      }
+      return best;
+    }
+    function applyAutoCoastalFocus() {
+      if (activeLocation) return;
+      fetch("/api/geo")
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(geo) {
+          if (!geo || !geo.available || activeLocation) return;
+          var anchor = nearestCoastalAnchor(geo.lat, geo.lon);
+          if (!anchor) return;
+          try { map.flyTo({ center: [anchor.lon, anchor.lat], zoom: anchor.zoom || 7, duration: 1800 }); }
+          catch (e) { /* map not ready */ }
+        })
+        .catch(function() { /* silent — fall back to default global view */ });
+    }
 
     // ── Helpers ──────────────────────────────────
     function timeAgo(dateStr) {
