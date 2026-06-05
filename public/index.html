@@ -989,7 +989,8 @@
       return "#";
     }
 
-    var TOKEN = "pk.eyJ1IjoiYnJ5YW50aGlnYSIsImEiOiJjbW5qaG1weGQwcTNkMnBwdXI1cTBkcTNhIn0.c96PKbqgeFGd_4NbW-w9PA";
+    // Build-time injection from NEXT_PUBLIC_MAPBOX_TOKEN via scripts/inject-env.js
+    var TOKEN = "__MAPBOX_TOKEN__";
     var TYPE_COLORS = { Attack: "#ef4444", Warning: "#f59e0b", Sighting: "#10b981", Unknown: "#3b82f6" };
 
     var allSightings = [];
