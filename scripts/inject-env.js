@@ -21,6 +21,18 @@ const path = require("path");
 
 const TARGET = path.join(__dirname, "..", "public", "index.html");
 
+// Local dev: load .env.local into process.env (Vercel injects env vars itself).
+const ENV_LOCAL = path.join(__dirname, "..", ".env.local");
+if (fs.existsSync(ENV_LOCAL)) {
+  for (const line of fs.readFileSync(ENV_LOCAL, "utf8").split("\n")) {
+    const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/);
+    if (!m) continue;
+    const [, k, raw] = m;
+    if (process.env[k]) continue;
+    process.env[k] = raw.replace(/^['"]|['"]$/g, "");
+  }
+}
+
 const SUBS = [
   {
     placeholder: "__MAPBOX_TOKEN__",

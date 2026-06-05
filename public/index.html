@@ -503,7 +503,8 @@
     }
     .species-header {
       font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
-      color: rgba(255,255,255,0.35); margin-bottom: 6px; font-weight: 600;
+      color: rgba(255,255,255,0.35); margin: 0 0 6px; font-weight: 600;
+      line-height: 1.2;
     }
     .species-bar {
       display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px;
@@ -900,7 +901,7 @@
       </div>
 
       <div class="species-section">
-        <div class="species-header">Species Spotted</div>
+        <h2 class="species-header">Species Spotted</h2>
         <div class="species-bar" id="species-bar"></div>
       </div>
 
@@ -1470,47 +1471,15 @@
     var geocodeCache = {};
     var MAPBOX_GEOCODE_URL = "https://api.mapbox.com/geocoding/v5/mapbox.places/";
 
-    // ── Surf spots (mirror of lib/surf-spots.ts; client-side only needs name/region/country/lat/lon/aliases/slug) ──
-    var SURF_SPOTS = [
-      { slug:"huntington-beach-pier", name:"Huntington Beach Pier", region:"California", country:"United States", lat:33.6543, lon:-118.0030, aliases:["hb pier","surf city","huntington beach"] },
-      { slug:"trestles", name:"Trestles", region:"California", country:"United States", lat:33.3847, lon:-117.5936, aliases:["lowers","lower trestles","san onofre"] },
-      { slug:"malibu-first-point", name:"Malibu First Point", region:"California", country:"United States", lat:34.0350, lon:-118.6774, aliases:["malibu","surfrider beach"] },
-      { slug:"pipeline", name:"Pipeline", region:"Oahu", country:"United States", lat:21.6657, lon:-158.0521, aliases:["banzai pipeline","ehukai beach"] },
-      { slug:"waimea-bay", name:"Waimea Bay", region:"Oahu", country:"United States", lat:21.6408, lon:-158.0643 },
-      { slug:"mavericks", name:"Mavericks", region:"California", country:"United States", lat:37.4942, lon:-122.5000 },
-      { slug:"steamer-lane", name:"Steamer Lane", region:"California", country:"United States", lat:36.9516, lon:-122.0263 },
-      { slug:"pleasure-point", name:"Pleasure Point", region:"California", country:"United States", lat:36.9563, lon:-121.9696 },
-      { slug:"ocean-beach-san-francisco", name:"Ocean Beach", region:"California", country:"United States", lat:37.7594, lon:-122.5107, aliases:["ocean beach sf","ob sf"] },
-      { slug:"newport-beach-56th-street", name:"Newport Beach 56th Street", region:"California", country:"United States", lat:33.6313, lon:-117.9533 },
-      { slug:"blacks-beach", name:"Blacks Beach", region:"California", country:"United States", lat:32.8898, lon:-117.2533 },
-      { slug:"la-jolla-shores", name:"La Jolla Shores", region:"California", country:"United States", lat:32.8570, lon:-117.2560 },
-      { slug:"cocoa-beach-pier", name:"Cocoa Beach Pier", region:"Florida", country:"United States", lat:28.3670, lon:-80.6023 },
-      { slug:"new-smyrna-beach", name:"New Smyrna Beach", region:"Florida", country:"United States", lat:29.0258, lon:-80.9262 },
-      { slug:"sebastian-inlet", name:"Sebastian Inlet", region:"Florida", country:"United States", lat:27.8606, lon:-80.4456 },
-      { slug:"wrightsville-beach", name:"Wrightsville Beach", region:"North Carolina", country:"United States", lat:34.2085, lon:-77.7964 },
-      { slug:"cape-hatteras-lighthouse", name:"Cape Hatteras Lighthouse", region:"North Carolina", country:"United States", lat:35.2505, lon:-75.5280 },
-      { slug:"montauk", name:"Montauk", region:"New York", country:"United States", lat:41.0359, lon:-71.9545 },
-      { slug:"rincon-puerto-rico", name:"Rincon", region:"Puerto Rico", country:"United States", lat:18.3402, lon:-67.2509 },
-      { slug:"tofinino-cox-bay", name:"Cox Bay", region:"British Columbia", country:"Canada", lat:49.1012, lon:-125.8725, aliases:["tofino","cox bay tofino"] },
-      { slug:"bondi-beach", name:"Bondi Beach", region:"New South Wales", country:"Australia", lat:-33.8915, lon:151.2767 },
-      { slug:"bells-beach", name:"Bells Beach", region:"Victoria", country:"Australia", lat:-38.3692, lon:144.2836 },
-      { slug:"snapper-rocks", name:"Snapper Rocks", region:"Queensland", country:"Australia", lat:-28.1646, lon:153.5502 },
-      { slug:"burleigh-heads", name:"Burleigh Heads", region:"Queensland", country:"Australia", lat:-28.0918, lon:153.4593 },
-      { slug:"margaret-river-main-break", name:"Margaret River Main Break", region:"Western Australia", country:"Australia", lat:-33.9765, lon:114.9878 },
-      { slug:"raglan-manu-bay", name:"Raglan Manu Bay", region:"Waikato", country:"New Zealand", lat:-37.8112, lon:174.8155, aliases:["manu bay","raglan"] },
-      { slug:"jeffreys-bay", name:"Jeffreys Bay", region:"Eastern Cape", country:"South Africa", lat:-34.0507, lon:24.9210, aliases:["j-bay","supertubes"] },
-      { slug:"dungeons", name:"Dungeons", region:"Western Cape", country:"South Africa", lat:-34.0572, lon:18.3336 },
-      { slug:"hossegor-la-graviere", name:"Hossegor La Graviere", region:"Nouvelle-Aquitaine", country:"France", lat:43.6655, lon:-1.4428 },
-      { slug:"mundaka", name:"Mundaka", region:"Basque Country", country:"Spain", lat:43.4074, lon:-2.6981 },
-      { slug:"nazare", name:"Nazare", region:"Leiria", country:"Portugal", lat:39.6057, lon:-9.0764 },
-      { slug:"ericeira-ribeira-dilhas", name:"Ribeira d'Ilhas", region:"Ericeira", country:"Portugal", lat:39.0057, lon:-9.4202 },
-      { slug:"uluwatu", name:"Uluwatu", region:"Bali", country:"Indonesia", lat:-8.8150, lon:115.0870 },
-      { slug:"padang-padang", name:"Padang Padang", region:"Bali", country:"Indonesia", lat:-8.8106, lon:115.1037 },
-      { slug:"cloudbreak", name:"Cloudbreak", region:"Mamanuca Islands", country:"Fiji", lat:-17.8569, lon:177.1824 },
-      { slug:"teahupoo", name:"Teahupoo", region:"Tahiti", country:"French Polynesia", lat:-17.8494, lon:-149.2676 },
-      { slug:"puerto-escondido-zicatela", name:"Puerto Escondido Zicatela", region:"Oaxaca", country:"Mexico", lat:15.8527, lon:-97.0516, aliases:["zicatela","puerto escondido"] },
-      { slug:"punta-de-lobos", name:"Punta de Lobos", region:"O'Higgins", country:"Chile", lat:-34.4254, lon:-72.0496 }
-    ];
+    // ── Surf spots — loaded from /api/surf-spots on page init ──
+    // Source of truth lives in lib/surf-spots.ts; the API endpoint serves
+    // the slim search-relevant subset. Falls back to empty list on failure,
+    // in which case the picker degrades to freeform geocoded search only.
+    var SURF_SPOTS = [];
+    fetch("/api/surf-spots")
+      .then(function(r) { return r.ok ? r.json() : { spots: [] }; })
+      .then(function(data) { SURF_SPOTS = (data && data.spots) || []; })
+      .catch(function() { /* picker still works via freeform search */ });
 
     function searchSurfSpots(query) {
       var q = (query || "").trim().toLowerCase();

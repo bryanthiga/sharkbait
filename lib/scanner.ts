@@ -359,19 +359,24 @@ const GOOGLE_NEWS_QUERIES = [
   "shark+spotted+New+Jersey", "shark+attack+Brazil+Recife",
 ];
 
+// Run queries in bounded parallel batches so total scan wall-clock is
+// bounded by the slowest query, not the sum. Concurrency 6 is well below
+// Google News' apparent rate limit and stays polite.
+const GOOGLE_NEWS_CONCURRENCY = 6;
+
 async function fetchGoogleNews(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  for (const q of GOOGLE_NEWS_QUERIES) {
+  const fetchOne = async (q: string): Promise<RawArticle[]> => {
     try {
       const res = await fetchWithTimeout(
         `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`,
         { headers: { "User-Agent": "sharkbait-app/1.0" } },
       );
-      if (!res.ok) continue;
+      if (!res.ok) return [];
       const xml = await res.text();
+      const out: RawArticle[] = [];
       for (const item of parseRssItems(xml)) {
         if (!SHARK_KEYWORDS_RE.test(item.title + " " + item.description)) continue;
-        results.push({
+        out.push({
           title: item.title,
           text: item.description,
           url: item.link,
@@ -379,10 +384,21 @@ async function fetchGoogleNews(): Promise<RawArticle[]> {
           source: "Google News",
         });
       }
-      await delay(300);
+      return out;
     } catch (err) {
-      console.error("[scanner] Google News query failed:", err instanceof Error ? err.message : err);
+      console.error(
+        "[scanner] Google News query failed:",
+        err instanceof Error ? err.message : err,
+      );
+      return [];
     }
+  };
+
+  const results: RawArticle[] = [];
+  for (let i = 0; i < GOOGLE_NEWS_QUERIES.length; i += GOOGLE_NEWS_CONCURRENCY) {
+    const batch = GOOGLE_NEWS_QUERIES.slice(i, i + GOOGLE_NEWS_CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(fetchOne));
+    for (const r of batchResults) results.push(...r);
   }
   return results;
 }
@@ -442,16 +458,15 @@ const INTL_NEWS_FEEDS = [
 ];
 
 async function fetchInternationalNews(): Promise<RawArticle[]> {
-  const results: RawArticle[] = [];
-  for (const feed of INTL_NEWS_FEEDS) {
+  const fetchOne = async (feed: typeof INTL_NEWS_FEEDS[number]): Promise<RawArticle[]> => {
     try {
       const url = `https://news.google.com/rss/search?q=${feed.q}&hl=${feed.hl}&gl=${feed.gl}&ceid=${feed.ceid}`;
       const res = await fetchWithTimeout(url, { headers: { "User-Agent": "sharkbait-app/1.0" } });
-      if (!res.ok) { await delay(200); continue; }
+      if (!res.ok) return [];
       const xml = await res.text();
+      const out: RawArticle[] = [];
       for (const item of parseRssItems(xml)) {
-        // Accept all items from these language-targeted feeds (already keyword-targeted)
-        results.push({
+        out.push({
           title: item.title,
           text: item.description,
           url: item.link,
@@ -459,10 +474,21 @@ async function fetchInternationalNews(): Promise<RawArticle[]> {
           source: feed.label,
         });
       }
-      await delay(250); // be polite to Google News
+      return out;
     } catch (err) {
-      console.error(`[scanner] Intl news ${feed.hl} failed:`, err instanceof Error ? err.message : err);
+      console.error(
+        `[scanner] Intl news ${feed.hl} failed:`,
+        err instanceof Error ? err.message : err,
+      );
+      return [];
     }
+  };
+
+  const results: RawArticle[] = [];
+  for (let i = 0; i < INTL_NEWS_FEEDS.length; i += GOOGLE_NEWS_CONCURRENCY) {
+    const batch = INTL_NEWS_FEEDS.slice(i, i + GOOGLE_NEWS_CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(fetchOne));
+    for (const r of batchResults) results.push(...r);
   }
   return results;
 }
