@@ -1,24 +1,28 @@
 #!/usr/bin/env node
 /**
- * inject-env.js — substitutes environment variables into public/index.html
- * during the build. Runs as a `prebuild` step so Vercel env vars actually
- * reach the static HTML.
+ * inject-env.js — generates public/index.html from public/index.template.html
+ * by substituting environment-variable placeholders.
+ *
+ * Source of truth: public/index.template.html (tracked in git, contains
+ * placeholders like __MAPBOX_TOKEN__).
+ * Output: public/index.html (gitignored, contains real values).
+ *
+ * Why a template? An earlier in-place version would overwrite the tracked
+ * index.html with the real token; running `git add -A` or `git commit -a`
+ * after a build would then leak the token. With this template pattern,
+ * the substituted file is never tracked, so secrets can't accidentally
+ * reach git.
  *
  * Placeholders supported:
  *   __MAPBOX_TOKEN__    -> process.env.NEXT_PUBLIC_MAPBOX_TOKEN
  *
  * If an env var is missing, the placeholder is left intact and a warning is
  * printed. The build continues — the page just won't have a working token.
- *
- * Important: this script REWRITES public/index.html in place. To keep the
- * source of truth in git as a template, public/index.html holds the
- * placeholder literal; the rewritten version lives only in the built
- * artifact (Vercel) or the developer's working tree after `npm run build`.
- * Don't commit a substituted index.html.
  */
 const fs = require("fs");
 const path = require("path");
 
+const TEMPLATE = path.join(__dirname, "..", "public", "index.template.html");
 const TARGET = path.join(__dirname, "..", "public", "index.html");
 
 // Local dev: load .env.local into process.env (Vercel injects env vars itself).
@@ -42,25 +46,27 @@ const SUBS = [
 ];
 
 function main() {
-  if (!fs.existsSync(TARGET)) {
-    console.error(`[inject-env] ${TARGET} not found`);
+  if (!fs.existsSync(TEMPLATE)) {
+    console.error(`[inject-env] template not found: ${TEMPLATE}`);
     process.exit(1);
   }
-  let html = fs.readFileSync(TARGET, "utf8");
-  let changed = false;
+  let html = fs.readFileSync(TEMPLATE, "utf8");
   for (const { placeholder, env, required } of SUBS) {
     if (!html.includes(placeholder)) continue;
     const value = process.env[env];
     if (!value) {
-      const msg = `[inject-env] ${env} is not set; placeholder ${placeholder} left in place`;
-      if (required) console.warn(msg);
+      if (required) {
+        console.warn(
+          `[inject-env] ${env} is not set; ${placeholder} will be left in output ` +
+            `(page won't work without it)`,
+        );
+      }
       continue;
     }
     html = html.split(placeholder).join(value);
-    changed = true;
     console.log(`[inject-env] Substituted ${placeholder} from ${env}`);
   }
-  if (changed) fs.writeFileSync(TARGET, html);
+  fs.writeFileSync(TARGET, html);
 }
 
 main();
