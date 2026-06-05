@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sharkbait.io"),
   title: "Sharkbait — Shark sightings near you",
   description:
     "Track shark sightings around the world. Map-first, mobile-friendly.",

@@ -20,13 +20,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const title = `${sp.name} sightings — Sharkbait`;
   const description = `Recent ${sp.name} shark sightings, attacks, and warnings on the Sharkbait live tracker.`;
   const url = `https://sharkbait.io/species/${sp.slug}`;
-  const image = "https://sharkbait.io/sharkbait-og.png";
+  // OG image inherited from app/opengraph-image.tsx
   return {
     title,
     description,
     alternates: { canonical: url },
-    openGraph: { title, description, url, images: [image] },
-    twitter: { card: "summary_large_image", title, description, images: [image] },
+    openGraph: { title, description, url },
+    twitter: { card: "summary_large_image", title, description },
   };
 }
 

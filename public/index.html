@@ -16,16 +16,16 @@
   <meta property="og:description" content="Track shark sightings worldwide in real time. See attacks, warnings, and encounters on a live map.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://sharkbait.io/">
-  <meta property="og:image" content="https://sharkbait.io/sharkbait-og.png">
+  <meta property="og:image" content="https://sharkbait.io/opengraph-image">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Sharkbait — Live Shark Tracker">
   <meta name="twitter:description" content="Track shark sightings worldwide in real time.">
-  <meta name="twitter:image" content="https://sharkbait.io/sharkbait-og.png">
+  <meta name="twitter:image" content="https://sharkbait.io/opengraph-image">
   <link rel="dns-prefetch" href="https://api.mapbox.com">
   <link rel="preconnect" href="https://api.mapbox.com" crossorigin>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.2/mapbox-gl.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -64,15 +64,21 @@
       animation: bob 3s ease-in-out infinite;
       filter: drop-shadow(0 2px 6px rgba(45,212,191,0.3));
     }
-    .logo-text { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 0.02em; }
+    .logo-textblock { display: flex; flex-direction: column; text-align: left; }
+    .logo-text { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: 0.02em; display: block; }
     .logo-text span {
       background: linear-gradient(135deg, #5eead4 0%, #2dd4bf 50%, #14b8a6 100%);
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
     }
     .logo-tagline {
       font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 0.06em;
-      font-weight: 500; margin-top: -2px;
+      font-weight: 500; margin-top: -2px; display: block;
     }
+
+    /* Button element resets for elements styled as cards/tiles */
+    button.logo, button.stat { font: inherit; color: inherit; -webkit-appearance: none; appearance: none; }
+    button.logo { text-align: left; }
+    button.stat { text-align: center; }
 
     /* ── Mapbox zoom: below the logo, away from hamburger ─── */
     .mapboxgl-ctrl-top-left {
@@ -843,13 +849,13 @@
   <div class="app">
     <div class="map-wrap">
       <div id="map"></div>
-      <div class="logo" onclick="map.flyTo({center:[-128,37],zoom:3.5,duration:1500})">
-        <img class="logo-shark" src="/shark-mascot.png" alt="Sharkbait mascot">
-        <div>
-          <div class="logo-text"><span>Sharkbait</span></div>
-          <div class="logo-tagline">Live shark tracker</div>
-        </div>
-      </div>
+      <button type="button" class="logo" id="logo-btn" aria-label="Reset map view">
+        <img class="logo-shark" src="/shark-mascot.png" alt="">
+        <span class="logo-textblock">
+          <span class="logo-text"><span>Sharkbait</span></span>
+          <span class="logo-tagline">Live shark tracker</span>
+        </span>
+      </button>
       <div class="loading-overlay" id="loading">
         <div class="loading-shark-wrap">
           <svg viewBox="0 0 64 36"><path d="M4,20 C8,14 16,12 22,14 L26,6 L30,14 C38,10 52,14 58,18 L60,14 L58,20 L62,22 C48,28 24,26 14,23 C9,22 5,22 4,20Z"/><circle cx="18" cy="16" r="1.5" fill="#020617"/></svg>
@@ -882,10 +888,10 @@
     <div class="sidebar" id="sidebar">
       <div class="sheet-handle" id="sheet-handle"><div class="sheet-handle-pill"></div></div>
       <div class="stats">
-        <div class="stat stat-total" data-filter="All"><div class="stat-icon">🦈</div><div class="stat-num" id="stat-total">0</div><div class="stat-label">Total</div></div>
-        <div class="stat stat-attack" data-filter="Attack"><div class="stat-icon">🩸</div><div class="stat-num" id="stat-attack">0</div><div class="stat-label">Attacks</div></div>
-        <div class="stat stat-warning" data-filter="Warning"><div class="stat-icon">⚠️</div><div class="stat-num" id="stat-warning">0</div><div class="stat-label">Warnings</div></div>
-        <div class="stat stat-sighting" data-filter="Sighting"><div class="stat-icon">👁️</div><div class="stat-num" id="stat-sighting">0</div><div class="stat-label">Sightings</div></div>
+        <button type="button" class="stat stat-total" data-filter="All" aria-label="Show all sightings"><span class="stat-icon">🦈</span><span class="stat-num" id="stat-total">0</span><span class="stat-label">Total</span></button>
+        <button type="button" class="stat stat-attack" data-filter="Attack" aria-label="Filter by attacks"><span class="stat-icon">🩸</span><span class="stat-num" id="stat-attack">0</span><span class="stat-label">Attacks</span></button>
+        <button type="button" class="stat stat-warning" data-filter="Warning" aria-label="Filter by warnings"><span class="stat-icon">⚠️</span><span class="stat-num" id="stat-warning">0</span><span class="stat-label">Warnings</span></button>
+        <button type="button" class="stat stat-sighting" data-filter="Sighting" aria-label="Filter by sightings"><span class="stat-icon">👁️</span><span class="stat-num" id="stat-sighting">0</span><span class="stat-label">Sightings</span></button>
       </div>
       <div class="nearby-banner" id="nearby-banner">
         <div class="nearby-title" id="nearby-title"></div>
@@ -1039,6 +1045,14 @@
       projection: "globe"
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-left");
+
+    // Logo click resets map view (keyboard-accessible button)
+    var logoBtn = document.getElementById("logo-btn");
+    if (logoBtn) {
+      logoBtn.addEventListener("click", function() {
+        map.flyTo({ center: [-128, 37], zoom: 3.5, duration: 1500 });
+      });
+    }
 
     map.on("load", function() {
       mapLoaded = true;
@@ -1680,7 +1694,7 @@
           })
           .catch(function(err) {
             input.placeholder = "Going surfing?";
-            console.error("Geocode failed:", err);
+            if (window.__SHARKBAIT_DEBUG__) console.error("Geocode failed:", err);
             showError("Search failed. Please try again.");
           });
       }
@@ -1754,7 +1768,7 @@
           updateNearbyBanner(loc || null);
         })
         .catch(function(err) {
-          console.error("Fetch failed:", err);
+          if (window.__SHARKBAIT_DEBUG__) console.error("Fetch failed:", err);
           if (!silent) {
             var feed = document.getElementById("feed");
             if (feed) feed.innerHTML = '<div class="empty">Failed to load sightings. Tap refresh to try again.</div>';
@@ -1969,13 +1983,14 @@
     fetchSightings();
 
     // ── Hamburger drawer + Supabase auth ────────────────
-    (function() {
+    // Wrapped in DOMContentLoaded so the deferred supabase-js global is ready.
+    document.addEventListener("DOMContentLoaded", function() {
       var SUPABASE_URL = "https://ixknullykihbxjlcmvog.supabase.co";
       var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aChhjIWW-XBzfK0F8UBmTA_81E6P76Q";
 
-      // Wait for the Supabase UMD script to load
+      // Defensive — should always be defined here, but guard anyway
       if (typeof supabase === "undefined" || !supabase.createClient) {
-        console.warn("[auth] Supabase JS not loaded; auth disabled");
+        if (window.__SHARKBAIT_DEBUG__) console.warn("[auth] Supabase JS not loaded; auth disabled");
         return;
       }
       var sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
@@ -2160,7 +2175,7 @@
         renderSession(res.data && res.data.session);
       });
       setMode("signin");
-    })();
+    });
 
   </script>
 </body>

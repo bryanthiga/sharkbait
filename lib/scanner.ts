@@ -209,13 +209,25 @@ const SORTED_LOCATIONS = Object.entries(KNOWN_LOCATIONS).sort(
   (a, b) => b[0].length - a[0].length,
 );
 
+// Precompiled per-location regexes with word boundaries so e.g. "york" doesn't
+// match inside "yorkshire". Built once at module load.
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+const LOCATION_REGEXES: Array<[string, { lat: number; lon: number }, RegExp]> =
+  SORTED_LOCATIONS.map(([name, coords]) => [
+    name,
+    coords,
+    new RegExp(`\\b${escapeRe(name)}\\b`, "i"),
+  ]);
+
 export function extractKnownLocation(
   title: string,
   description: string,
 ): { name: string; lat: number; lon: number } | null {
-  const text = `${title} ${description || ""}`.toLowerCase();
-  for (const [name, coords] of SORTED_LOCATIONS) {
-    if (text.includes(name)) {
+  const text = `${title} ${description || ""}`;
+  for (const [name, coords, re] of LOCATION_REGEXES) {
+    if (re.test(text)) {
       return { name: name.replace(/\b\w/g, (c) => c.toUpperCase()), ...coords };
     }
   }
@@ -832,7 +844,13 @@ async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
     );
     if (!res.ok) return [];
     const text = await res.text();
-    if (text.length > 2 * 1024 * 1024) return [];
+    const MAX_BYTES = 5 * 1024 * 1024;
+    if (text.length > MAX_BYTES) {
+      console.warn(
+        `[scanner] Ocearch payload ${text.length} bytes exceeds ${MAX_BYTES}; skipping`,
+      );
+      return [];
+    }
     const sharks = JSON.parse(text);
     const items = (Array.isArray(sharks) ? sharks : []).slice(0, 500);
     for (const shark of items) {
@@ -861,6 +879,26 @@ async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
 
 // ─── Processing pipeline ────────────────────────────────────
 
+// Normalize a URL for dedupe: lowercase host, strip query string for known
+// aggregator hosts (Google News, Bing News) that surface the same article
+// under different tracking params. Trailing slash also stripped.
+function normalizeUrlForDedupe(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    u.hostname = u.hostname.toLowerCase();
+    const stripQuery = /(^|\.)(news\.google\.com|news\.bing\.com|bing\.com|google\.com)$/.test(
+      u.hostname,
+    );
+    if (stripQuery) u.search = "";
+    u.hash = "";
+    let s = u.toString();
+    if (s.endsWith("/")) s = s.slice(0, -1);
+    return s;
+  } catch {
+    return rawUrl;
+  }
+}
+
 export async function processArticles(
   articles: RawArticleWithCoords[],
   seenUrls: Set<string>,
@@ -868,8 +906,9 @@ export async function processArticles(
   const sightings: Sighting[] = [];
 
   for (const article of articles) {
-    if (article.url && seenUrls.has(article.url)) continue;
-    if (article.url) seenUrls.add(article.url);
+    const dedupeKey = article.url ? normalizeUrlForDedupe(article.url) : "";
+    if (dedupeKey && seenUrls.has(dedupeKey)) continue;
+    if (dedupeKey) seenUrls.add(dedupeKey);
 
     const species =
       article.species || extractSpecies(article.title, article.text);

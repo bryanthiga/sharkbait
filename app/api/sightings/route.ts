@@ -31,6 +31,14 @@ function parseFloatParam(value: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function isValidLat(n: number | null): n is number {
+  return n != null && n >= -90 && n <= 90;
+}
+
+function isValidLon(n: number | null): n is number {
+  return n != null && n >= -180 && n <= 180;
+}
+
 function clamp(n: number, min: number, max: number): number {
   return Math.min(Math.max(n, min), max);
 }
@@ -60,7 +68,14 @@ export async function GET(req: NextRequest) {
     } else {
       const lat = parseFloatParam(url.searchParams.get("lat"));
       const lon = parseFloatParam(url.searchParams.get("lon"));
-      if (lat != null && lon != null) {
+      if (lat != null || lon != null) {
+        // If either was supplied, both must be valid — else 400 to flag bad client
+        if (!isValidLat(lat) || !isValidLon(lon)) {
+          return NextResponse.json(
+            { error: "lat must be in [-90, 90] and lon in [-180, 180]" },
+            { status: 400 },
+          );
+        }
         const radiusMiles = clamp(
           radiusParam ?? DEFAULT_RADIUS_MILES,
           MIN_RADIUS_MILES,
