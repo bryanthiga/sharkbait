@@ -3,7 +3,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 const indexHtml = readFileSync(
-  join(__dirname, "..", "public", "index.html"),
+  join(__dirname, "..", "public", "index.template.html"),
   "utf-8",
 );
 
