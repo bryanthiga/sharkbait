@@ -13,6 +13,20 @@ interface CacheEntry {
 let cache: CacheEntry | null = null;
 let fetchInProgress: Promise<Sighting[]> | null = null;
 const CACHE_TTL = 5 * 60 * 1000;
+const MAX_EVENT_AGE_DAYS = 365;
+const TRUSTED_SOCIAL_SOURCES = new Set([
+  "r/sharks",
+  "r/SharkAttacks",
+  "r/marinebiology",
+]);
+
+function isCredibleEvent(sighting: Sighting): boolean {
+  if (sighting.type === "Unknown") return false;
+  if (sighting.source.startsWith("r/") && !TRUSTED_SOCIAL_SOURCES.has(sighting.source)) {
+    return false;
+  }
+  return sighting.healthScore == null || sighting.healthScore >= 40;
+}
 
 export async function getCachedSightings(): Promise<{
   sightings: Sighting[];
@@ -24,7 +38,12 @@ export async function getCachedSightings(): Promise<{
   if (!fetchInProgress) {
     fetchInProgress = (async () => {
       const raw = await scanForSightings();
-      const scored = await scoreSightings(raw);
+      const oldestAllowed = Date.now() - MAX_EVENT_AGE_DAYS * 24 * 60 * 60 * 1000;
+      const current = raw.filter((s) => {
+        const timestamp = Date.parse(s.date);
+        return Number.isFinite(timestamp) && timestamp >= oldestAllowed;
+      });
+      const scored = await scoreSightings(current);
       return scored.map((s) => ({
         ...s,
         confidence: getConfidenceLabel(s.healthScore),
@@ -48,6 +67,36 @@ export interface FilterOptions {
 
 export type SightingWithDistance = Sighting & { distanceMiles?: number };
 
+function dedupeKey(sighting: Sighting): string {
+  const day = sighting.date.slice(0, 10);
+  if (sighting.source === "iNaturalist") {
+    return [
+      "inat",
+      sighting.species.toLowerCase(),
+      sighting.lat.toFixed(2),
+      sighting.lon.toFixed(2),
+      day,
+    ].join("|");
+  }
+
+  const headline = sighting.title
+    .toLowerCase()
+    .replace(/\s+[-|]\s+.*/, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  return `news|${headline}`;
+}
+
+function dedupeSightings(sightings: SightingWithDistance[]): SightingWithDistance[] {
+  const seen = new Set<string>();
+  return sightings.filter((sighting) => {
+    const key = dedupeKey(sighting);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 export function applyFilters(
   sightings: Sighting[],
   opts: FilterOptions = {},
@@ -62,7 +111,8 @@ export function applyFilters(
       const t = Date.parse(s.date);
       return !isNaN(t) && t >= cutoff;
     })
-    .filter((s) => includeRelated || !isRelatedMarine(s.species));
+    .filter((s) => includeRelated || !isRelatedMarine(s.species))
+    .filter(isCredibleEvent);
 
   if (opts.near) {
     const center = { lat: opts.near.lat, lon: opts.near.lon };
@@ -72,7 +122,8 @@ export function applyFilters(
       .filter((s) => (s.distanceMiles as number) <= radius);
   }
 
-  return filtered
-    .sort((a, b) => Date.parse(b.date) - Date.parse(a.date))
+  filtered.sort((a, b) => Date.parse(b.date) - Date.parse(a.date));
+
+  return dedupeSightings(filtered)
     .slice(0, limit);
 }

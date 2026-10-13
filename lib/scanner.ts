@@ -260,7 +260,7 @@ export function classifySighting(title: string, description: string): SightingTy
   // Warning — EN + ES + PT + FR + IT + JA + ID
   if (/(warning|alert|closed|advisory|ban|closure|alerta|aviso|fechado|avertissement|fermeture|interdiction|allerta|chiusura|注意|警告|peringatan|larangan)/.test(text)) return "Warning";
   // Sighting — EN + ES + PT + FR + IT + JA + ID + ZH
-  if (/(spotted|seen|sighting|encounter|swimming|avistamiento|avistado|avistamento|observation|observé|avvistamento|avvistato|目撃|発見|penampakan|terlihat|发现|看到)/.test(text)) return "Sighting";
+  if (/(spotted|seen|sighting|encounter|swimming|observed|avistamiento|avistado|avistamento|observation|observé|avvistamento|avvistato|目撃|発見|penampakan|terlihat|发现|看到)/.test(text)) return "Sighting";
   return "Unknown";
 }
 
@@ -360,9 +360,9 @@ const GOOGLE_NEWS_QUERIES = [
 ];
 
 // Run queries in bounded parallel batches so total scan wall-clock is
-// bounded by the slowest query, not the sum. Concurrency 6 is well below
-// Google News' apparent rate limit and stays polite.
-const GOOGLE_NEWS_CONCURRENCY = 6;
+// bounded by two network rounds instead of making mobile users wait through
+// four sequential batches on a cold cache.
+const GOOGLE_NEWS_CONCURRENCY = 12;
 
 async function fetchGoogleNews(): Promise<RawArticle[]> {
   const fetchOne = async (q: string): Promise<RawArticle[]> => {
@@ -843,7 +843,7 @@ async function fetchINaturalist(): Promise<RawArticleWithCoords[]> {
           obs?.time_observed_at ?? obs?.observed_on ?? obs?.created_at ?? "";
         results.push({
           title: `${commonName} observed${place ? ` at ${place}` : ""}`,
-          text: place || commonName,
+          text: place || `${lat.toFixed(3)}, ${lon.toFixed(3)}`,
           url: `https://www.inaturalist.org/observations/${obs.id}`,
           date: safeIsoDate(observedAt),
           source: "iNaturalist",
@@ -955,7 +955,10 @@ export async function processArticles(
       continue;
     }
 
-    const known = extractKnownLocation(article.title, article.text);
+    // Syndicated headlines commonly end in " - Publisher". Do not let a
+    // publisher such as New York Post override the incident location.
+    const locationTitle = article.title.replace(/\s+-\s+[^-]+$/, "");
+    const known = extractKnownLocation(locationTitle, article.text);
     if (known) {
       sightings.push({
         id: makeId(article.url, article.source),
@@ -980,15 +983,14 @@ export async function processArticles(
 export async function scanForSightings(): Promise<Sighting[]> {
   const [
     newsApi, googleNews, bingNews, ocearch,
-    intlNews, reddit, guardian, abcAU, isaf, src, dorsal,
-    redditSubs, inaturalist, youtube, nitter,
+    intlNews, guardian, abcAU, isaf, src, dorsal,
+    redditSubs, inaturalist, youtube,
   ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
     fetchBingNews(),
     fetchOcearch(),
     fetchInternationalNews(),
-    fetchReddit(),
     fetchGuardian(),
     fetchABCAustralia(),
     fetchISAF(),
@@ -997,7 +999,6 @@ export async function scanForSightings(): Promise<Sighting[]> {
     fetchRedditSubs(),
     fetchINaturalist(),
     fetchYouTube(),
-    fetchNitter(),
   ]);
 
   const allArticles: RawArticleWithCoords[] = [
@@ -1006,7 +1007,6 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...bingNews,
     ...ocearch,
     ...intlNews,
-    ...reddit,
     ...guardian,
     ...abcAU,
     ...isaf,
@@ -1015,7 +1015,6 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...redditSubs,
     ...inaturalist,
     ...youtube,
-    ...nitter,
   ];
 
   const seenUrls = new Set<string>();
