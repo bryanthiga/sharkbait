@@ -20,7 +20,7 @@ export const SPECIES: SpeciesEntry[] = [
   { slug: "reef-shark", name: "Reef Shark", matchers: ["reef shark"] },
 ];
 
-const RELATED_MARINE_TERMS = ["ray", "skate", "guitarfish", "sawfish", "manta"];
+const RELATED_MARINE_TERMS = ["ray", "skate", "guitarfish", "sawfish", "manta", "stingaree"];
 
 export function getSpeciesBySlug(slug: string): SpeciesEntry | undefined {
   return SPECIES.find((s) => s.slug === slug);

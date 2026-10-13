@@ -173,6 +173,10 @@ describe("classifySighting", () => {
     expect(classifySighting("Shark encounter reported", "")).toBe("Sighting");
   });
 
+  it("classifies iNaturalist 'observed' records as Sighting", () => {
+    expect(classifySighting("Great white shark observed", "")).toBe("Sighting");
+  });
+
   it("returns Unknown when nothing matches", () => {
     expect(classifySighting("New research on sharks", "")).toBe("Unknown");
   });
@@ -306,6 +310,20 @@ describe("processArticles", () => {
     const result = await processArticles(articles, new Set());
     expect(result).toHaveLength(1);
     expect(result[0].location).toBe("Cape Cod");
+  });
+
+  it("does not treat a publisher suffix as the event location", async () => {
+    const articles = [
+      {
+        title: "Shark attacks kayaker in Malibu - New York Post",
+        text: "Paradise Cove incident",
+        url: "http://news.com/malibu",
+        date: "2026-01-01",
+        source: "Google News",
+      },
+    ];
+    const result = await processArticles(articles, new Set());
+    expect(result[0].location).toBe("Malibu");
   });
 
   it("skips articles with no coords and no known location", async () => {

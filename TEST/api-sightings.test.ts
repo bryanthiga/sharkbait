@@ -1,4 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextRequest } from "next/server";
+
+function request(query = "") {
+  return new NextRequest(`http://localhost/api/sightings${query}`);
+}
 
 describe("GET /api/sightings", () => {
   beforeEach(() => {
@@ -11,7 +16,7 @@ describe("GET /api/sightings", () => {
       scanForSightings: vi.fn().mockRejectedValue(new Error("External API down")),
     }));
     const { GET } = await import("../app/api/sightings/route");
-    const response = await GET();
+    const response = await GET(request());
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe("Failed to fetch sightings");
@@ -23,18 +28,18 @@ describe("GET /api/sightings", () => {
       scanForSightings: vi.fn().mockRejectedValue(new Error("ECONNREFUSED 10.0.0.1:443")),
     }));
     const { GET } = await import("../app/api/sightings/route");
-    const response = await GET();
+    const response = await GET(request());
     const data = await response.json();
     expect(data.error).toBe("Failed to fetch sightings");
   });
 
-  it("returns JSON array including pinned sightings on success", async () => {
+  it("returns recent sightings using the current response contract", async () => {
     vi.doMock("@/lib/scanner", () => ({
       scanForSightings: vi.fn().mockResolvedValue([
         {
           id: "test-1",
           title: "Test Sighting",
-          date: "2024-01-01T00:00:00Z",
+          date: new Date().toISOString(),
           location: "Test Beach",
           lat: 30,
           lon: -80,
@@ -46,11 +51,12 @@ describe("GET /api/sightings", () => {
       ]),
     }));
     const { GET } = await import("../app/api/sightings/route");
-    const response = await GET();
+    const response = await GET(request());
     const data = await response.json();
-    expect(Array.isArray(data)).toBe(true);
-    expect(data.length).toBeGreaterThanOrEqual(2);
-    expect(data[0].id).toBe("pinned-malibu-attack");
+    expect(Array.isArray(data.sightings)).toBe(true);
+    expect(data.sightings).toHaveLength(1);
+    expect(data.sightings[0].id).toBe("test-1");
+    expect(data.fetchedAt).toEqual(expect.any(String));
   });
 
   it("returns Cache-Control headers", async () => {
@@ -58,25 +64,32 @@ describe("GET /api/sightings", () => {
       scanForSightings: vi.fn().mockResolvedValue([]),
     }));
     const { GET } = await import("../app/api/sightings/route");
-    const response = await GET();
+    const response = await GET(request());
     expect(response.headers.get("Cache-Control")).toBe(
       "public, s-maxage=300, stale-while-revalidate=600",
     );
   });
 
-  it("pinned sighting has today's date", async () => {
+  it("filters old events from the default 30-day feed", async () => {
     vi.doMock("@/lib/scanner", () => ({
-      scanForSightings: vi.fn().mockResolvedValue([]),
+      scanForSightings: vi.fn().mockResolvedValue([
+        {
+          id: "old-event",
+          title: "Old shark sighting",
+          date: "2024-01-01T00:00:00Z",
+          location: "Old Beach",
+          lat: 30,
+          lon: -80,
+          type: "Sighting",
+          species: "Unknown",
+          source: "Test",
+          url: "https://example.com/old",
+        },
+      ]),
     }));
     const { GET } = await import("../app/api/sightings/route");
-    const response = await GET();
+    const response = await GET(request());
     const data = await response.json();
-    const pinned = data.find(
-      (s: { id: string }) => s.id === "pinned-malibu-attack",
-    );
-    expect(pinned).toBeDefined();
-    const pinnedDate = new Date(pinned.date);
-    const now = new Date();
-    expect(Math.abs(now.getTime() - pinnedDate.getTime())).toBeLessThan(5000);
+    expect(data.sightings).toEqual([]);
   });
 });

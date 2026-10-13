@@ -28,6 +28,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     body {
       font-family: system-ui, -apple-system, sans-serif;
@@ -161,6 +162,17 @@
     .drawer-header {
       padding: 20px 22px 12px; flex-shrink: 0;
     }
+    .drawer-back {
+      display: inline-flex; align-items: center; gap: 7px;
+      min-height: 40px; margin: -4px 0 14px; padding: 0 10px 0 2px;
+      border: 0; background: transparent; color: #5eead4;
+      font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    }
+    .drawer-back::before {
+      content: ""; width: 9px; height: 9px;
+      border-left: 2px solid currentColor; border-bottom: 2px solid currentColor;
+      transform: rotate(45deg); margin-left: 4px;
+    }
     .drawer-title {
       font-size: 22px; font-weight: 800; color: #fff;
       letter-spacing: -0.01em; margin-bottom: 4px;
@@ -261,6 +273,11 @@
     @media (max-width: 767px) {
       .menu-btn { top: 12px; right: 12px; }
       .drawer { width: 100vw; max-width: 420px; }
+      .drawer-header { padding: calc(10px + env(safe-area-inset-top)) 18px 10px; }
+      .drawer-title { font-size: 20px; }
+      .drawer-tabs { padding: 0 18px; }
+      .drawer-form { padding: 6px 18px calc(22px + env(safe-area-inset-bottom)); gap: 12px; }
+      .drawer-account { padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
     }
 
     /* ── Loading: centered pill that does NOT block the map ─ */
@@ -339,7 +356,7 @@
 
       .sidebar {
         position: fixed; bottom: 0; left: 0; right: 0;
-        height: 91dvh; /* max when fully open */
+        height: 89dvh; /* leaves map context visible when fully open */
         max-height: none; min-height: 0;
         border-radius: 22px 22px 0 0;
         border-top: 1px solid rgba(45,212,191,0.15);
@@ -360,6 +377,7 @@
         display: flex; align-items: center; justify-content: center;
         padding: 10px 0 4px; flex-shrink: 0; cursor: grab;
         user-select: none; -webkit-user-select: none;
+        width: 100%; border: 0; background: transparent;
       }
       .sheet-handle-pill {
         width: 36px; height: 4px; border-radius: 99px;
@@ -372,14 +390,14 @@
 
       /* Stats: slightly more compact on mobile */
       .stats {
-        padding: 8px 8px;
+        padding: 6px 8px 9px;
         gap: 4px;
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
-      .stat { padding: 9px 2px 7px; border-radius: 14px; min-width: 0; }
-      .stat-num { font-size: 18px; }
-      .stat-icon { font-size: 16px; }
-      .stat-label { font-size: 7px; letter-spacing: 0; }
+      .stat { height: 64px; padding: 7px 2px 6px; border-radius: 12px; min-width: 0; }
+      .stat-num { font-size: 17px; line-height: 1; }
+      .stat-icon { font-size: 14px; line-height: 1; }
+      .stat-label { font-size: 8px; line-height: 1; letter-spacing: 0; }
 
       /* Species bar: only visible when sheet is half/full */
       .species-section {
@@ -398,8 +416,8 @@
       .time-range { padding: 6px 10px; }
 
       /* Cards: more readable on mobile */
-      .card { padding: 13px 14px; margin-bottom: 8px; border-radius: 16px; }
-      .card-title { font-size: 13.5px; -webkit-line-clamp: 3; }
+      .card { padding: 12px; margin-bottom: 8px; border-radius: 12px; }
+      .card-title { font-size: 13px; line-height: 1.35; -webkit-line-clamp: 2; }
       .card-location { font-size: 12px; margin-top: 6px; }
       .card-meta { font-size: 11px; margin-top: 6px; }
       .card-meta a { font-size: 12px; }
@@ -411,7 +429,7 @@
       .feed { padding: 8px 10px 24px; touch-action: pan-y; }
 
       /* Refresh bar */
-      .refresh-bar { padding: 6px 12px 10px; }
+      .refresh-bar { padding: 6px 12px calc(10px + env(safe-area-inset-bottom)); }
       .refresh-btn { padding: 13px; font-size: 13px; border-radius: 16px; }
     }
 
@@ -672,25 +690,40 @@
 
     /* ── Surf spot picker (compact utility, not hero) ── */
     .surf-picker {
-      position: absolute;
-      top: 188px;
-      left: 12px;
-      width: 110px;
-      z-index: 35;
-      transition: width 0.18s ease;
+      position: absolute; top: 188px; left: 12px; z-index: 35;
     }
-    .surf-picker:has(.surf-picker-radius.active) { width: 170px; }
     @media (min-width: 768px) {
-      .surf-picker { top: 196px; left: 14px; width: 120px; }
-      .surf-picker:has(.surf-picker-radius.active) { width: 200px; }
+      .surf-picker { top: 196px; left: 14px; }
+    }
+    .surf-picker-toggle {
+      display: inline-flex; align-items: center; gap: 8px;
+      max-width: min(210px, calc(100vw - 82px)); height: 38px;
+      padding: 0 13px; border: 1px solid rgba(45,212,191,0.26);
+      border-radius: 999px; background: rgba(2,6,23,0.82); color: #e2e8f0;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.35); backdrop-filter: blur(16px);
+      font: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+    }
+    .surf-picker-toggle::before {
+      content: ""; width: 8px; height: 8px; flex: 0 0 auto;
+      border: 2px solid #5eead4; border-radius: 50%;
+      box-shadow: 0 0 0 3px rgba(45,212,191,0.1);
+    }
+    .surf-picker-toggle-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .surf-picker-toggle[aria-expanded="true"] { border-color: rgba(94,234,212,0.6); }
+    .surf-picker-panel {
+      position: absolute; top: 44px; left: 0;
+      width: min(320px, calc(100vw - 24px)); padding: 10px;
+      border: 1px solid rgba(45,212,191,0.22); border-radius: 14px;
+      background: rgba(2,6,23,0.96); box-shadow: 0 14px 40px rgba(0,0,0,0.55);
+      backdrop-filter: blur(20px);
     }
     .surf-picker-row { display: flex; gap: 6px; align-items: center; }
     .surf-picker-input {
-      width: 100%; height: 30px;
+      width: 100%; height: 42px;
       border: 1px solid rgba(45,212,191,0.18);
       border-radius: 999px;
       background: rgba(2,6,23,0.6); color: #e2e8f0;
-      padding: 0 12px; font: inherit; font-size: 11px;
+      padding: 0 13px; font: inherit; font-size: 13px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.25);
       backdrop-filter: blur(14px);
       -webkit-backdrop-filter: blur(14px);
@@ -703,17 +736,17 @@
       box-shadow: 0 0 0 2px rgba(45,212,191,0.12), 0 2px 10px rgba(0,0,0,0.25);
     }
     .surf-picker-clear {
-      height: 30px;
+      height: 42px;
       border: 1px solid rgba(45,212,191,0.16);
       border-radius: 999px;
       background: rgba(15,23,42,0.7); color: #5eead4;
-      padding: 0 10px; font: inherit; font-size: 10px;
+      padding: 0 11px; font: inherit; font-size: 11px;
       cursor: pointer; white-space: nowrap;
     }
     .surf-picker-clear:hover { background: rgba(45,212,191,0.12); }
     .surf-picker-menu {
-      position: absolute; top: 36px; left: 0; right: 0;
-      max-height: 300px; overflow: auto;
+      position: relative; margin-top: 8px;
+      max-height: min(220px, 32dvh); overflow: auto;
       border: 1px solid rgba(45,212,191,0.18);
       border-radius: 12px;
       background: rgba(2,6,23,0.96);
@@ -728,12 +761,12 @@
       width: 100%; border: 0;
       border-bottom: 1px solid rgba(148,163,184,0.06);
       background: transparent; color: #f8fafc;
-      padding: 7px 11px; text-align: left; cursor: pointer;
+      padding: 10px 11px; text-align: left; cursor: pointer;
       font: inherit;
     }
     .surf-picker-option:last-child { border-bottom: 0; }
     .surf-picker-option:hover, .surf-picker-option:focus { background: rgba(45,212,191,0.1); outline: none; }
-    .surf-picker-name { font-size: 11px; font-weight: 600; }
+    .surf-picker-name { font-size: 12px; font-weight: 600; }
     .surf-picker-meta { font-size: 10px; color: rgba(203,213,225,0.6); }
     .surf-picker-empty { padding: 10px; color: rgba(203,213,225,0.7); font-size: 11px; }
     .surf-picker-error { padding: 8px 12px; color: #fca5a5; font-size: 10px; margin-top: 6px; background: rgba(239,68,68,0.08); border: 1px solid rgba(239,68,68,0.2); border-radius: 999px; }
@@ -823,6 +856,69 @@
 
     .empty { padding: 60px 20px; text-align: center; font-size: 13px; color: #475569; }
 
+    /* Keep mobile overrides last so component defaults cannot override them. */
+    @media (max-width: 767px) {
+      .stats { padding: 6px 8px 9px; gap: 4px; }
+      .stat {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        height: 64px; min-width: 0; padding: 6px 2px; border-radius: 12px;
+      }
+      .stat-icon { display: block; margin: 0 0 2px; font-size: 14px; line-height: 1; }
+      .stat-num { display: block; font-size: 19px; line-height: 1; }
+      .stat-label {
+        display: block; max-width: 100%; margin-top: 3px;
+        overflow: hidden; text-overflow: ellipsis;
+        font-size: 7px; line-height: 1; letter-spacing: 0;
+      }
+      .filter-btn { min-height: 40px; padding: 10px 14px; font-size: 12px; }
+      .time-pill { min-height: 40px; padding: 10px 16px; font-size: 12px; }
+      .filters { padding: 6px 10px; gap: 6px; overflow-x: auto; }
+      .time-range { padding: 6px 10px; overflow-x: auto; }
+      .card { padding: 12px; margin-bottom: 8px; border-radius: 12px; }
+      .card-title { font-size: 13px; line-height: 1.35; -webkit-line-clamp: 2; }
+      .card-location { font-size: 12px; margin-top: 6px; }
+      .card-meta { font-size: 11px; margin-top: 6px; }
+      .feed { padding: 8px 10px 24px; touch-action: pan-y; }
+      .refresh-bar { padding: 6px 12px calc(10px + env(safe-area-inset-bottom)); }
+      .sidebar.sheet-peek .species-section,
+      .sidebar.sheet-peek .nearby-banner {
+        display: none;
+      }
+      body.sheet-full .surf-picker {
+        opacity: 0; pointer-events: none; transform: translateY(-8px);
+      }
+      .surf-picker { transition: opacity 0.2s ease, transform 0.2s ease; }
+      .sidebar.sheet-half .species-section,
+      .sidebar.sheet-full .species-section {
+        max-height: 94px; padding: 2px 10px 4px;
+      }
+      .species-header { margin-bottom: 3px; font-size: 9px; }
+      .species-bar { gap: 4px; padding-bottom: 2px; }
+      .species-item { min-width: 58px; padding: 3px 2px; border-radius: 10px; }
+      .species-icon { width: 38px; height: 38px; border-radius: 9px; }
+      .species-label { max-width: 56px; overflow: hidden; text-overflow: ellipsis; font-size: 8px; }
+      .species-count { top: 0; right: 1px; min-width: 15px; height: 13px; font-size: 7px; }
+      .time-range { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .time-pill { min-height: 38px; padding: 0 4px; font-size: 11px; }
+      .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .filter-btn { min-height: 38px; padding: 0 3px; font-size: 10px; }
+      .card-header { gap: 6px; }
+      .badge { padding: 3px 6px; font-size: 7px; }
+      .card-meta { flex-wrap: wrap; row-gap: 3px; }
+      .auto-focus-toggle { margin-top: 5px; padding: 3px 10px; font-size: 9px; }
+    }
+
+    @media (max-width: 359px) {
+      .logo { padding-right: 10px; gap: 7px; }
+      .logo-shark { width: 40px; height: 40px; }
+      .logo-text { font-size: 16px; }
+      .logo-tagline { display: none; }
+      .surf-picker-toggle { max-width: 150px; }
+      .stat-num { font-size: 17px; }
+      .stat-label { font-size: 6px; }
+      .filter-btn { font-size: 9px; }
+    }
+
 
     /* ── Animations ────────────────────────────────── */
     @keyframes bob {
@@ -865,29 +961,27 @@
       </div>
 
       <div class="surf-picker" id="surf-picker">
-        <div class="surf-picker-row">
-          <input
-            type="text"
-            id="surf-picker-input"
-            class="surf-picker-input"
-            placeholder="Going surfing?"
-            aria-label="Search location"
-            autocomplete="off"
-          >
-          <button type="button" class="surf-picker-clear" id="surf-picker-clear" hidden>Clear</button>
+        <button type="button" class="surf-picker-toggle" id="surf-picker-toggle" aria-expanded="false" aria-controls="surf-picker-panel">
+          <span class="surf-picker-toggle-label" id="surf-picker-toggle-label">Going surfing?</span>
+        </button>
+        <div class="surf-picker-panel" id="surf-picker-panel" hidden>
+          <div class="surf-picker-row">
+            <input type="text" id="surf-picker-input" class="surf-picker-input" placeholder="ZIP, city, state, or beach" aria-label="Search location" autocomplete="off">
+            <button type="button" class="surf-picker-clear" id="surf-picker-clear" hidden>Clear</button>
+          </div>
+          <div class="surf-picker-menu hidden" id="surf-picker-menu" role="listbox"></div>
+          <div class="surf-picker-radius" id="surf-picker-radius-wrap">
+            <input type="range" min="10" max="100" step="10" value="100" id="surf-picker-radius" aria-label="Search radius (miles)">
+            <span class="surf-picker-radius-label" id="surf-picker-radius-label">100 mi</span>
+          </div>
+          <div class="surf-picker-error hidden" id="surf-picker-error"></div>
         </div>
-        <div class="surf-picker-menu hidden" id="surf-picker-menu" role="listbox"></div>
-        <div class="surf-picker-radius" id="surf-picker-radius-wrap">
-          <input type="range" min="10" max="100" step="10" value="100" id="surf-picker-radius" aria-label="Search radius (miles)">
-          <span class="surf-picker-radius-label" id="surf-picker-radius-label">100 mi</span>
-        </div>
-        <div class="surf-picker-error hidden" id="surf-picker-error"></div>
       </div>
     </div>
 
     <div class="resize-handle" id="resize-handle"><div class="grip"></div></div>
     <div class="sidebar" id="sidebar">
-      <div class="sheet-handle" id="sheet-handle"><div class="sheet-handle-pill"></div></div>
+      <button type="button" class="sheet-handle" id="sheet-handle" aria-label="Expand results"><span class="sheet-handle-pill"></span></button>
       <div class="stats">
         <button type="button" class="stat stat-total" data-filter="All" aria-label="Show all sightings"><span class="stat-icon">🦈</span><span class="stat-num" id="stat-total">0</span><span class="stat-label">Total</span></button>
         <button type="button" class="stat stat-attack" data-filter="Attack" aria-label="Filter by attacks"><span class="stat-icon">🩸</span><span class="stat-num" id="stat-attack">0</span><span class="stat-label">Attacks</span></button>
@@ -906,10 +1000,10 @@
       </div>
 
       <div class="time-range" id="time-range">
-        <button class="time-pill active" data-range="all">All Time</button>
+        <button class="time-pill" data-range="all">All Time</button>
         <button class="time-pill" data-range="today">Today</button>
-        <button class="time-pill" data-range="7d">7 Day</button>
-        <button class="time-pill" data-range="30d">Monthly</button>
+        <button class="time-pill" data-range="7d">7 Days</button>
+        <button class="time-pill active" data-range="30d">30 Days</button>
       </div>
 
       <div class="filters">
@@ -937,6 +1031,7 @@
   <div class="drawer-backdrop" id="drawer-backdrop"></div>
   <aside class="drawer" id="drawer" aria-hidden="true">
     <div class="drawer-header">
+      <button type="button" class="drawer-back" id="drawer-back">Back to map</button>
       <div class="drawer-title" id="drawer-title">Sign in to Sharkbait</div>
       <div class="drawer-subtitle" id="drawer-subtitle">
         Save your favorite sightings and get notified when sharks are spotted near you.
@@ -997,7 +1092,7 @@
     var allSightings = [];
     var currentFilter = "All";
     var currentSpecies = "All";
-    var currentTimeRange = "all";
+    var currentTimeRange = "30d";
     var selectedId = null;
     var activePopup = null;
     var mapLoaded = false;
@@ -1446,7 +1541,7 @@
         document.querySelectorAll(".time-pill").forEach(function(p) { p.classList.remove("active"); });
         this.classList.add("active");
         currentTimeRange = this.getAttribute("data-range");
-        render();
+        fetchSightings(false);
       });
     });
 
@@ -1530,11 +1625,26 @@
       var menu  = document.getElementById("surf-picker-menu");
       var clearBtn = document.getElementById("surf-picker-clear");
       var picker = document.getElementById("surf-picker");
+      var toggle = document.getElementById("surf-picker-toggle");
+      var toggleLabel = document.getElementById("surf-picker-toggle-label");
+      var panel = document.getElementById("surf-picker-panel");
       var radiusWrap = document.getElementById("surf-picker-radius-wrap");
       var radiusInput = document.getElementById("surf-picker-radius");
       var radiusLabel = document.getElementById("surf-picker-radius-label");
       var errorEl = document.getElementById("surf-picker-error");
-      if (!input || !menu) return;
+      if (!input || !menu || !toggle || !panel) return;
+
+      function setExpanded(expanded) {
+        panel.hidden = !expanded;
+        toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        if (expanded) {
+          renderMenu(input.value);
+          menu.classList.remove("hidden");
+          requestAnimationFrame(function() { input.focus(); });
+        } else {
+          closeMenu();
+        }
+      }
 
       function showError(msg) {
         if (!errorEl) return;
@@ -1570,6 +1680,7 @@
       function openMenu() { renderMenu(input.value); menu.classList.remove("hidden"); }
       function closeMenu() { menu.classList.add("hidden"); }
 
+      toggle.addEventListener("click", function() { setExpanded(panel.hidden); });
       input.addEventListener("focus", openMenu);
       input.addEventListener("input", openMenu);
 
@@ -1583,10 +1694,10 @@
       });
 
       document.addEventListener("mousedown", function(e) {
-        if (!picker.contains(e.target)) closeMenu();
+        if (!picker.contains(e.target)) setExpanded(false);
       });
       input.addEventListener("keydown", function(e) {
-        if (e.key === "Escape") { closeMenu(); input.blur(); return; }
+        if (e.key === "Escape") { setExpanded(false); toggle.focus(); return; }
         if (e.key === "Enter") {
           e.preventDefault();
           var q = input.value.trim();
@@ -1621,8 +1732,9 @@
           radiusMiles: 100,
         };
         input.value = spot.name;
+        toggleLabel.textContent = spot.name;
         clearBtn.hidden = false;
-        closeMenu();
+        setExpanded(false);
         setRadiusUI(activeLocation.radiusMiles);
         showRadiusSlider(true);
 
@@ -1635,10 +1747,10 @@
       }
 
       function submitFreeform(query) {
-        input.placeholder = "Searching…";
+        input.placeholder = "Searching...";
         geocodeViaMapbox(query)
           .then(function(result) {
-            input.placeholder = "Going surfing?";
+            input.placeholder = "ZIP, city, state, or beach";
             if (!result) {
               showError("Couldn't find that location. Try a ZIP, city/state, or country.");
               return;
@@ -1651,9 +1763,11 @@
               radiusMiles: 100,
             };
             input.value = result.name.split(",").slice(0, 2).join(",");
+            toggleLabel.textContent = input.value;
             clearBtn.hidden = false;
             setRadiusUI(activeLocation.radiusMiles);
             showRadiusSlider(true);
+            setExpanded(false);
 
             try { map.flyTo({ center: [result.lon, result.lat], zoom: 8, duration: 1200 }); }
             catch (err) { /* map not ready */ }
@@ -1663,7 +1777,7 @@
             fetchSightings(false);
           })
           .catch(function(err) {
-            input.placeholder = "Going surfing?";
+            input.placeholder = "ZIP, city, state, or beach";
             if (window.__SHARKBAIT_DEBUG__) console.error("Geocode failed:", err);
             showError("Search failed. Please try again.");
           });
@@ -1672,8 +1786,9 @@
       function clearLocation() {
         activeLocation = null;
         input.value = "";
+        toggleLabel.textContent = "Going surfing?";
         clearBtn.hidden = true;
-        closeMenu();
+        setExpanded(false);
         showRadiusSlider(false);
         clearSearchMarker();
         updateNearbyBanner(null);
@@ -1714,7 +1829,8 @@
         document.getElementById("loading").classList.remove("hidden");
       }
 
-      var qs = "t=" + Date.now();
+      var requestedDays = currentTimeRange === "all" ? 365 : 30;
+      var qs = "t=" + Date.now() + "&days=" + requestedDays;
       var loc = activeLocation;
       if (loc) {
         if (loc.kind === "spot" && loc.slug) {
@@ -1804,7 +1920,7 @@
       var feed    = document.getElementById("feed");
 
       // Snap positions (px translate from bottom) — computed at runtime
-      var PEEK_SHOW = 94;   // px of sheet visible in peek mode (handle + stats)
+      var PEEK_SHOW = 104;  // px of sheet visible in peek mode (handle + full stats)
       var state = "peek";   // "peek" | "half" | "full"
       var startY = 0, startTY = 0, isDragging = false;
       var velY = 0, lastY = 0, lastT = 0;
@@ -1830,6 +1946,9 @@
         state = s;
         sidebar.classList.remove("sheet-peek","sheet-half","sheet-full");
         sidebar.classList.add("sheet-" + s);
+        document.body.classList.remove("sheet-peek","sheet-half","sheet-full");
+        document.body.classList.add("sheet-" + s);
+        handle.setAttribute("aria-label", s === "full" ? "Collapse results" : "Expand results");
         applyTranslate(translateFor(s), animate);
       }
 
@@ -1970,6 +2089,7 @@
       var btn         = document.getElementById("menu-btn");
       var drawer      = document.getElementById("drawer");
       var backdrop    = document.getElementById("drawer-backdrop");
+      var backBtn     = document.getElementById("drawer-back");
       var form        = document.getElementById("auth-form");
       var submit      = document.getElementById("auth-submit");
       var tabs        = document.querySelectorAll(".drawer-tab");
@@ -2061,6 +2181,7 @@
         if (drawer.classList.contains("open")) closeDrawer(); else openDrawer();
       });
       backdrop.addEventListener("click", closeDrawer);
+      backBtn.addEventListener("click", closeDrawer);
       document.addEventListener("keydown", function(e) {
         if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
       });

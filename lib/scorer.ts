@@ -90,10 +90,14 @@ export async function scoreSightings(sightings: Sighting[]): Promise<Sighting[]>
 
   if (queue.length === 0) return result;
 
-  // Score in batches
-  const scoreMap = new Map<number, number>();
+  // Score independent batches concurrently so credibility checks add one
+  // network round to a cold scan rather than one round per 60 articles.
+  const batches: QueueEntry[][] = [];
   for (let i = 0; i < queue.length; i += BATCH_SIZE) {
-    const batch = queue.slice(i, i + BATCH_SIZE);
+    batches.push(queue.slice(i, i + BATCH_SIZE));
+  }
+
+  const scoredBatches = await Promise.all(batches.map(async (batch) => {
     const items = batch.map((entry, bIdx) => ({
       idx: bIdx,
       title: entry.sighting.title,
@@ -101,10 +105,15 @@ export async function scoreSightings(sightings: Sighting[]): Promise<Sighting[]>
       location: entry.sighting.location,
     }));
     const scores = await scoreBatch(items);
+    return { batch, scores };
+  }));
+
+  const scoreMap = new Map<number, number>();
+  scoredBatches.forEach(({ batch, scores }) => {
     batch.forEach((entry, bIdx) => {
       scoreMap.set(entry.originalIdx, scores[bIdx] ?? 50);
     });
-  }
+  });
 
   return result.map((s, i) => {
     if (scoreMap.has(i)) return { ...s, healthScore: scoreMap.get(i)! };
