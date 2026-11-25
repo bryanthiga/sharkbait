@@ -249,7 +249,7 @@ export function classifySighting(title: string, description: string): SightingTy
   // Attack — EN + ES + PT + FR + IT + JA + ID
   if (/(attack|bite|bitten|mauled|fatal|ataque|atacado|attaque|mordu|blessé|attacco|morso|被害|咬|serangan|diserang|biss|gebissen)/.test(text)) return "Attack";
   // Warning — EN + ES + PT + FR + IT + JA + ID
-  if (/(warning|alert|closed|advisory|ban|closure|alerta|aviso|fechado|avertissement|fermeture|interdiction|allerta|chiusura|注意|警告|peringatan|larangan)/.test(text)) return "Warning";
+  if (/(warning|alert|closed|advisory|\bban\b|closure|alerta|aviso|fechado|avertissement|fermeture|interdiction|allerta|chiusura|注意|警告|peringatan|larangan)/.test(text)) return "Warning";
   // Sighting — EN + ES + PT + FR + IT + JA + ID + ZH
   if (/(spotted|seen|sighting|encounter|swimming|observed|avistamiento|avistado|avistamento|observation|observé|avvistamento|avvistato|目撃|発見|penampakan|terlihat|发现|看到)/.test(text)) return "Sighting";
   return "Unknown";

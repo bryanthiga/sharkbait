@@ -133,6 +133,9 @@ describe("extractSpecies", () => {
 // ─── classifySighting ───────────────────────────────────────
 
 describe("classifySighting", () => {
+  it("does not mistake Albany for a ban", () => {
+    expect(classifySighting("Smooth Hammerhead observed at Albany", "Albany Ward, Auckland")).toBe("Sighting");
+  });
   it("classifies 'attack' as Attack", () => {
     expect(classifySighting("Shark attack in Florida", "")).toBe("Attack");
   });

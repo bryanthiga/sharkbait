@@ -45,4 +45,19 @@ describe("GET /api/floods", () => {
     expect(response.headers.get("cache-control")).toContain("s-maxage=300");
     expect(await response.json()).toMatchObject({ reports: [] });
   });
+
+  it("excludes cancelled and expired NWS alerts", async () => {
+    const base = { event: "Coastal Flood Warning", sent: "2026-11-24T12:00:00Z" };
+    const features = [
+      { properties: { ...base, id: "cancelled", headline: "The Coastal Flood Warning has been cancelled." } },
+      { properties: { ...base, id: "cancel-type", messageType: "Cancel" } },
+      { properties: { ...base, id: "expired", expires: "2000-01-01T00:00:00Z" } },
+      { properties: { ...base, id: "active" } },
+    ];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => Response.json({ features: url.includes("weather.gov") ? features : [] })));
+
+    const response = await GET();
+    const data = await response.json();
+    expect(data.reports.map((report: { id: string }) => report.id)).toEqual(["nws:active"]);
+  });
 });

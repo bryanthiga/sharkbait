@@ -133,13 +133,16 @@ async function fetchNwsFloodReports(): Promise<SourceResult> {
       const geometry = normalizeGeometry(feature.geometry);
       const event = asText(properties.event);
       if (!/flood/i.test(event)) return [];
+      const headline = asText(properties.headline, event);
+      const expires = Date.parse(asText(properties.expires));
+      if (/^(cancel|error)$/i.test(asText(properties.messageType)) || /\b(cancelled|canceled|has expired)\b/i.test(headline) || (Number.isFinite(expires) && expires <= Date.now())) return [];
       const center = getCenter(geometry);
       const sent = asText(properties.effective, asText(properties.sent));
       const id = asText(properties.id, asText(properties["@id"]));
       if (!id || !Number.isFinite(Date.parse(sent))) return [];
       return [{
         id: `nws:${id}`,
-        title: asText(properties.headline, event),
+        title: headline,
         date: sent,
         location: asText(properties.areaDesc, "United States"),
         lat: center?.lat ?? null,

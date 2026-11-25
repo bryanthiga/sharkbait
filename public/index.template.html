@@ -695,6 +695,12 @@
     .badge-sighting { background: rgba(16,185,129,0.1); color: #a7f3d0; border-color: rgba(16,185,129,0.2); }
     .badge-unknown { background: rgba(59,130,246,0.1); color: #bfdbfe; border-color: rgba(59,130,246,0.2); }
     .badge-flood { background: rgba(14,165,233,0.12); color: #bae6fd; border-color: rgba(14,165,233,0.3); }
+    .report-switch { display:flex; gap:6px; padding:4px 10px; flex-shrink:0; }
+    .report-switch button { flex:1; min-height:40px; border-radius:10px; border:1px solid rgba(148,163,184,.25); background:rgba(15,23,42,.9); color:#cbd5e1; font:600 12px system-ui; cursor:pointer; }
+    .report-switch button[aria-pressed="true"] { color:#fff; border-color:#2dd4bf; background:rgba(13,148,136,.35); }
+    .sidebar.flood-view .filters { display:none; }
+    .sidebar.flood-view .species-section { display:none; }
+    #surf-picker { display:none; }
 
     .flood-note {
       margin: 8px 10px 2px; padding: 9px 11px;
@@ -931,7 +937,7 @@
       .species-count { top: 0; right: 1px; min-width: 15px; height: 13px; font-size: 7px; }
       .time-range { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .time-pill { min-height: 38px; padding: 0 4px; font-size: 11px; }
-      .filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .filter-btn { min-height: 40px; padding: 0 2px; font-size: 10px; }
       .card-header { gap: 6px; }
       .badge { padding: 3px 6px; font-size: 7px; }
@@ -1014,6 +1020,10 @@
     <div class="resize-handle" id="resize-handle"><div class="grip"></div></div>
     <div class="sidebar" id="sidebar">
       <button type="button" class="sheet-handle" id="sheet-handle" aria-label="Expand results"><span class="sheet-handle-pill"></span></button>
+      <div class="report-switch" role="group" aria-label="Report type">
+        <button type="button" data-report-mode="All" aria-pressed="true">🦈 Sharks</button>
+        <button type="button" data-report-mode="Flood" aria-pressed="false">🌊 Floods</button>
+      </div>
       <div class="stats">
         <button type="button" class="stat stat-total" data-filter="All" aria-label="Show all sightings"><span class="stat-icon">🦈</span><span class="stat-num" id="stat-total">0</span><span class="stat-label">Total</span></button>
         <button type="button" class="stat stat-attack" data-filter="Attack" aria-label="Filter by attacks"><span class="stat-icon">🩸</span><span class="stat-num" id="stat-attack">0</span><span class="stat-label">Attacks</span></button>
@@ -1043,7 +1053,6 @@
         <button class="filter-btn" data-filter="Attack">🔴 Attacks</button>
         <button class="filter-btn" data-filter="Warning">🟠 Warnings</button>
         <button class="filter-btn" data-filter="Sighting">🟢 Sightings</button>
-        <button class="filter-btn" data-filter="Flood" aria-label="Show flood reports">🌊 Floods</button>
       </div>
 
       <div class="feed" id="feed"></div>
@@ -1738,6 +1747,9 @@
       }
       if (currentFilter !== filter) selectedId = null;
       currentFilter = filter;
+      document.querySelectorAll("[data-report-mode]").forEach(function(button) {
+        button.setAttribute("aria-pressed", String((filter === "Flood") === (button.getAttribute("data-report-mode") === "Flood")));
+      });
       document.getElementById("sidebar").classList.toggle("flood-view", filter === "Flood");
       var totalStat = document.querySelector(".stat-total");
       totalStat.setAttribute("data-filter", filter === "Flood" ? "Flood" : "All");
@@ -1755,6 +1767,9 @@
       btn.addEventListener("click", function() {
         setFilter(this.getAttribute("data-filter"));
       });
+    });
+    document.querySelectorAll("[data-report-mode]").forEach(function(button) {
+      button.addEventListener("click", function() { setFilter(this.getAttribute("data-report-mode")); });
     });
 
     document.querySelectorAll(".stat[data-filter]").forEach(function(stat) {
@@ -2215,7 +2230,7 @@
       var feed    = document.getElementById("feed");
 
       // Snap positions (px translate from bottom) — computed at runtime
-      var PEEK_SHOW = 104;  // px of sheet visible in peek mode (handle + full stats)
+      var PEEK_SHOW = 150;  // handle, report switch, and stats
       var state = "peek";   // "peek" | "half" | "full"
       var startY = 0, startTY = 0, isDragging = false;
       var velY = 0, lastY = 0, lastT = 0;
