@@ -25,21 +25,12 @@ function fetchWithTimeout(
   options: RequestInit = {},
   timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
-  const controller = new AbortController();
-  const id = setTimeout(() => controller.abort(), timeoutMs);
-  return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-    clearTimeout(id),
-  );
+  return fetch(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
 }
 
 function safeIsoDate(dateStr: string): string {
-  if (!dateStr) return new Date().toISOString();
-  try {
-    const d = new Date(dateStr);
-    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
-  } catch {
-    return new Date().toISOString();
-  }
+  const timestamp = Date.parse(dateStr);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : "";
 }
 
 // Known shark-prone locations with pre-baked coordinates (skips geocoding)
@@ -589,14 +580,15 @@ async function fetchABCAustralia(): Promise<RawArticle[]> {
 
 // ─── Source 3e: Florida Museum ISAF ─────────────────────────
 
-async function fetchISAF(): Promise<RawArticle[]> {
+async function fetchISAF(): Promise<RawArticle[] | null> {
   try {
     const res = await fetchWithTimeout(
       "https://www.floridamuseum.ufl.edu/shark-attacks/feed/",
       { headers: { "User-Agent": "sharkbait-app/1.0" } },
     );
-    if (!res.ok) return [];
+    if (!res.ok) return null;
     const xml = await res.text();
+    if (!/<rss\b/i.test(xml)) return null;
     return parseRssItems(xml).map((item) => ({
       title: item.title,
       text: item.description,
@@ -606,53 +598,7 @@ async function fetchISAF(): Promise<RawArticle[]> {
     }));
   } catch (err) {
     console.error("[scanner] ISAF failed:", err instanceof Error ? err.message : err);
-    return [];
-  }
-}
-
-// ─── Source 3f: Shark Research Committee ────────────────────
-
-async function fetchSRC(): Promise<RawArticle[]> {
-  try {
-    const res = await fetchWithTimeout(
-      "https://www.sharkresearchcommittee.com/feed/",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } },
-    );
-    if (!res.ok) return [];
-    const xml = await res.text();
-    return parseRssItems(xml).map((item) => ({
-      title: item.title,
-      text: item.description,
-      url: item.link,
-      date: safeIsoDate(item.pubDate),
-      source: "Shark Research Committee",
-    }));
-  } catch (err) {
-    console.error("[scanner] SRC failed:", err instanceof Error ? err.message : err);
-    return [];
-  }
-}
-
-// ─── Source 3g: Dorsal Watch AU ─────────────────────────────
-
-async function fetchDorsal(): Promise<RawArticle[]> {
-  try {
-    const res = await fetchWithTimeout(
-      "https://dorsal.org/feed/",
-      { headers: { "User-Agent": "sharkbait-app/1.0" } },
-    );
-    if (!res.ok) return [];
-    const xml = await res.text();
-    return parseRssItems(xml).map((item) => ({
-      title: item.title,
-      text: item.description,
-      url: item.link,
-      date: safeIsoDate(item.pubDate),
-      source: "Dorsal Watch AU",
-    }));
-  } catch (err) {
-    console.error("[scanner] Dorsal failed:", err instanceof Error ? err.message : err);
-    return [];
+    return null;
   }
 }
 
@@ -807,100 +753,51 @@ async function fetchNitter(): Promise<RawArticle[]> {
 // ─── Source 3i: iNaturalist (citizen-science, GPS-tagged) ───
 // Returns research-grade shark observations with GPS coords baked in.
 
-const INAT_TAXA = [
-  { id: 47273, name: "Sharks (Selachimorpha)" },
-];
-
-async function fetchINaturalist(): Promise<RawArticleWithCoords[]> {
-  const results: RawArticleWithCoords[] = [];
-  for (const taxon of INAT_TAXA) {
-    try {
-      const params = new URLSearchParams({
-        taxon_id: String(taxon.id),
-        quality_grade: "research",
-        per_page: "100",
-        order_by: "observed_on",
-        order: "desc",
-        mappable: "true",
-        photos: "true",
-      });
-      const res = await fetchWithTimeout(
-        `https://api.inaturalist.org/v1/observations?${params}`,
-        { headers: { "User-Agent": "sharkbait-app/1.0" } },
-      );
-      if (!res.ok) continue;
-      const data = await res.json();
-      for (const obs of (data?.results ?? [])) {
-        const coords = obs?.geojson?.coordinates;
-        if (!Array.isArray(coords) || coords.length < 2) continue;
-        const lon = parseFloat(coords[0]);
-        const lat = parseFloat(coords[1]);
-        if (isNaN(lat) || isNaN(lon)) continue;
-        const commonName: string =
-          obs?.taxon?.preferred_common_name ?? obs?.taxon?.name ?? "Shark";
-        const place: string = obs?.place_guess ?? "";
-        const observedAt: string =
-          obs?.time_observed_at ?? obs?.observed_on ?? obs?.created_at ?? "";
-        results.push({
-          title: `${commonName} observed${place ? ` at ${place}` : ""}`,
-          text: place || `${lat.toFixed(3)}, ${lon.toFixed(3)}`,
-          url: `https://www.inaturalist.org/observations/${obs.id}`,
-          date: safeIsoDate(observedAt),
-          source: "iNaturalist",
-          lat,
-          lon,
-          species: commonName,
-        });
-      }
-    } catch (err) {
-      console.error("[scanner] iNaturalist failed:", err instanceof Error ? err.message : err);
-    }
-  }
-  return results;
-}
-
-// ─── Source 4: Ocearch Shark Tracker (free, no key) ──────────
-
-async function fetchOcearch(): Promise<RawArticleWithCoords[]> {
-  const results: RawArticleWithCoords[] = [];
+async function fetchINaturalist(): Promise<RawArticleWithCoords[] | null> {
   try {
+    const params = new URLSearchParams({
+      taxon_id: "47273", // Sharks (Selachimorpha)
+      quality_grade: "research",
+      per_page: "100",
+      order_by: "observed_on",
+      order: "desc",
+      mappable: "true",
+      photos: "true",
+    });
     const res = await fetchWithTimeout(
-      "https://www.ocearch.org/tracker/ajax/animals",
+      `https://api.inaturalist.org/v1/observations?${params}`,
       { headers: { "User-Agent": "sharkbait-app/1.0" } },
     );
-    if (!res.ok) return [];
-    const text = await res.text();
-    const MAX_BYTES = 5 * 1024 * 1024;
-    if (text.length > MAX_BYTES) {
-      console.warn(
-        `[scanner] Ocearch payload ${text.length} bytes exceeds ${MAX_BYTES}; skipping`,
-      );
-      return [];
-    }
-    const sharks = JSON.parse(text);
-    const items = (Array.isArray(sharks) ? sharks : []).slice(0, 500);
-    for (const shark of items) {
-      const lat = parseFloat(shark.lat ?? shark.latitude ?? "");
-      const lon = parseFloat(shark.lng ?? shark.lon ?? shark.longitude ?? "");
-      if (isNaN(lat) || isNaN(lon)) continue;
-      const name = shark.name ?? "Unknown shark";
-      const species = shark.species ?? shark.species_common ?? "";
-      const pinged = shark.pings?.[0]?.datetime ?? shark.last_ping ?? "";
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!Array.isArray(data?.results)) return null;
+
+    const results: RawArticleWithCoords[] = [];
+    for (const obs of data.results) {
+      const coords = obs?.geojson?.coordinates;
+      if (!Number.isInteger(obs?.id) || !Array.isArray(coords)) continue;
+      const [lon, lat] = coords;
+      if (!Number.isFinite(lat) || Math.abs(lat) > 90 ||
+          !Number.isFinite(lon) || Math.abs(lon) > 180) continue;
+
+      const species = obs.taxon?.preferred_common_name ?? obs.taxon?.name ?? "Shark";
+      const place = obs.place_guess ?? "";
       results.push({
-        title: `${name} (${species}) — tracked by Ocearch`,
-        text: `GPS-tagged ${species} "${name}" last pinged at this location.`,
-        url: `https://www.ocearch.org/tracker/detail/${shark.id ?? shark.slug ?? ""}`,
-        date: safeIsoDate(pinged),
-        source: "Ocearch Tracker",
+        title: `${species} observed${place ? ` at ${place}` : ""}`,
+        text: place || `${lat.toFixed(3)}, ${lon.toFixed(3)}`,
+        url: `https://www.inaturalist.org/observations/${obs.id}`,
+        date: safeIsoDate(obs.time_observed_at ?? obs.observed_on ?? ""),
+        source: "iNaturalist",
         lat,
         lon,
-        species: species || undefined,
+        species,
       });
     }
+    return results;
   } catch (err) {
-    console.error("[scanner] Ocearch failed:", err instanceof Error ? err.message : err);
+    console.error("[scanner] iNaturalist failed:", err instanceof Error ? err.message : err);
+    return null;
   }
-  return results;
 }
 
 // ─── Processing pipeline ────────────────────────────────────
@@ -932,6 +829,7 @@ export async function processArticles(
   const sightings: Sighting[] = [];
 
   for (const article of articles) {
+    if (!Number.isFinite(Date.parse(article.date))) continue;
     const dedupeKey = article.url ? normalizeUrlForDedupe(article.url) : "";
     if (dedupeKey && seenUrls.has(dedupeKey)) continue;
     if (dedupeKey) seenUrls.add(dedupeKey);
@@ -982,20 +880,17 @@ export async function processArticles(
 
 export async function scanForSightings(): Promise<Sighting[]> {
   const [
-    newsApi, googleNews, bingNews, ocearch,
-    intlNews, guardian, abcAU, isaf, src, dorsal,
+    newsApi, googleNews, bingNews,
+    intlNews, guardian, abcAU, isaf,
     redditSubs, inaturalist, youtube,
   ] = await Promise.all([
     fetchNewsApi(),
     fetchGoogleNews(),
     fetchBingNews(),
-    fetchOcearch(),
     fetchInternationalNews(),
     fetchGuardian(),
     fetchABCAustralia(),
     fetchISAF(),
-    fetchSRC(),
-    fetchDorsal(),
     fetchRedditSubs(),
     fetchINaturalist(),
     fetchYouTube(),
@@ -1005,17 +900,17 @@ export async function scanForSightings(): Promise<Sighting[]> {
     ...newsApi,
     ...googleNews,
     ...bingNews,
-    ...ocearch,
     ...intlNews,
     ...guardian,
     ...abcAU,
-    ...isaf,
-    ...src,
-    ...dorsal,
+    ...(isaf ?? []),
     ...redditSubs,
-    ...inaturalist,
+    ...(inaturalist ?? []),
     ...youtube,
   ];
+  if (!allArticles.length && isaf === null && inaturalist === null) {
+    throw new Error("No sighting sources returned usable data");
+  }
 
   const seenUrls = new Set<string>();
   const sightings = await processArticles(allArticles, seenUrls);

@@ -30,10 +30,7 @@ const MODEL = "claude-haiku-4-5-20251001";
 const BATCH_SIZE = 60;
 
 const TRUSTED_SOURCES = new Set([
-  "Ocearch Tracker",
   "Florida Museum ISAF",
-  "Shark Research Committee",
-  "Dorsal Watch AU",
   "iNaturalist",
 ]);
 
@@ -43,7 +40,7 @@ async function scoreBatch(
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return items.map(() => 50);
 
-  const client = new Anthropic({ apiKey });
+  const client = new Anthropic({ apiKey, timeout: 4000, maxRetries: 0 });
 
   const prompt = `Rate each shark news article 0-100 for credibility and likelihood of being a real incident.
 

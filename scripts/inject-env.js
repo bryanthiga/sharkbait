@@ -16,8 +16,8 @@
  * Placeholders supported:
  *   __MAPBOX_TOKEN__    -> process.env.NEXT_PUBLIC_MAPBOX_TOKEN
  *
- * If an env var is missing, the placeholder is left intact and a warning is
- * printed. The build continues — the page just won't have a working token.
+ * If the public token is unavailable, the build leaves the placeholder intact
+ * so the client can run in list-only mode.
  */
 const fs = require("fs");
 const path = require("path");
@@ -54,11 +54,11 @@ function main() {
   for (const { placeholder, env, required } of SUBS) {
     if (!html.includes(placeholder)) continue;
     const value = process.env[env];
-    if (!value) {
+    if (!value || !/^pk\.[A-Za-z0-9._-]+$/.test(value)) {
       if (required) {
         console.warn(
-          `[inject-env] ${env} is not set; ${placeholder} will be left in output ` +
-            `(page won't work without it)`,
+          `[inject-env] ${env} needs a public Mapbox token beginning with pk. ` +
+            `The app will serve reports without the map.`,
         );
       }
       continue;

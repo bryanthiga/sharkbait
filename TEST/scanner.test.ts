@@ -367,23 +367,28 @@ describe("scanForSightings", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns empty array when all sources fail", async () => {
-    const result = await scanForSightings();
-    expect(Array.isArray(result)).toBe(true);
+  it("distinguishes a full upstream outage from an empty feed", async () => {
+    await expect(scanForSightings()).rejects.toThrow("No sighting sources returned usable data");
+
+    vi.stubGlobal("fetch", vi.fn(async (url: string) =>
+      url.includes("inaturalist.org")
+        ? { ok: true, json: async () => ({ results: [] }) }
+        : { ok: false },
+    ));
+    await expect(scanForSightings()).resolves.toEqual([]);
   });
 
   it("returns Sighting[] with all required fields when data available", async () => {
     const mockFetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes("ocearch")) {
+      if (url.includes("inaturalist.org")) {
         return Promise.resolve({
           ok: true,
-          json: async () => [
-            { name: "Bruce", species: "Great White", lat: "30.0", lng: "-80.0", pings: [{ datetime: "2024-01-01T00:00:00Z" }], id: "1" },
-          ],
-          text: async () =>
-            JSON.stringify([
-              { name: "Bruce", species: "Great White", lat: "30.0", lng: "-80.0", pings: [{ datetime: "2024-01-01T00:00:00Z" }], id: "1" },
-            ]),
+          json: async () => ({ results: [{
+            id: 1,
+            taxon: { preferred_common_name: "Great White Shark" },
+            geojson: { coordinates: [-80, 30] },
+            observed_on: "2024-01-01",
+          }] }),
         });
       }
       return Promise.resolve({ ok: false, json: async () => ({}), text: async () => "" });

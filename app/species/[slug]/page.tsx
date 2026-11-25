@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCachedSightings, applyFilters } from "@/lib/sightings-store";
-import { SPECIES, getSpeciesBySlug, matchesSpecies } from "@/lib/species";
+import { getCachedSightings, applyFilters, type SightingWithDistance } from "@/lib/sightings-store";
+import { getSpeciesBySlug, matchesSpecies } from "@/lib/species";
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -10,7 +10,7 @@ interface Props {
 export const revalidate = 300;
 
 export function generateStaticParams() {
-  return SPECIES.map((s) => ({ slug: s.slug }));
+  return []; // Generate species pages on first request so builds can run offline.
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -35,10 +35,14 @@ export default async function SpeciesPage({ params }: Props) {
   const sp = getSpeciesBySlug(slug);
   if (!sp) notFound();
 
-  const { sightings: all } = await getCachedSightings();
-  const filtered = applyFilters(all, { days: 30, limit: 200 }).filter((s) =>
-    matchesSpecies(s.species, sp),
-  );
+  let filtered: SightingWithDistance[] | null;
+  try {
+    const { sightings: all } = await getCachedSightings();
+    filtered = applyFilters(all.filter((s) => matchesSpecies(s.species, sp)), { days: 30, limit: 200 });
+  } catch (error) {
+    console.error("[sightings/species] Scan failed:", error);
+    filtered = null;
+  }
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -47,11 +51,10 @@ export default async function SpeciesPage({ params }: Props) {
       </a>
       <h1 className="mt-4 text-3xl font-bold">{sp.name} sightings</h1>
       <p className="mt-2 text-slate-400">
-        {filtered.length} {sp.name} sighting{filtered.length === 1 ? "" : "s"}{" "}
-        in the last 30 days.
+        {filtered ? `${filtered.length} ${sp.name} sighting${filtered.length === 1 ? "" : "s"} in the last 30 days.` : "Sightings are temporarily unavailable."}
       </p>
       <ul className="mt-8 space-y-3">
-        {filtered.map((s) => (
+        {filtered?.map((s) => (
           <li
             key={s.id}
             className="rounded-lg border border-ocean-800/60 bg-ocean-900/40 p-4"
@@ -78,7 +81,7 @@ export default async function SpeciesPage({ params }: Props) {
             <div className="mt-1 text-xs text-slate-500">{s.source}</div>
           </li>
         ))}
-        {filtered.length === 0 && (
+        {filtered?.length === 0 && (
           <li className="text-slate-500">
             No {sp.name} sightings reported in the last 30 days.
           </li>

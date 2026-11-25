@@ -295,6 +295,24 @@
     }
     .loading-overlay.hidden { opacity: 0; pointer-events: none; }
 
+    .map-status {
+      position: absolute;
+      top: 24%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: calc(100% - 32px);
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #0f172a;
+      color: #e2e8f0;
+      font-size: 12px;
+      text-align: center;
+      pointer-events: none;
+    }
+    .sightings-status { margin-bottom: 6px; color: #fbbf24; font-size: 12px; text-align: center; }
+    .flood-view .sightings-status { display: none; }
+
     .loading-shark-wrap {
       width: 24px; height: 16px; position: relative;
       animation: swimLoading 1.6s ease-in-out infinite;
@@ -364,8 +382,9 @@
         z-index: 30;
         transform: translateY(var(--sheet-translate, 0px));
         will-change: transform;
-        /* default: peek (set by JS on load) */
-        touch-action: none;
+        /* Keep the report feed natively scrollable; the touch handler still
+           drags the sheet from its handle and from the feed's top edge. */
+        touch-action: auto;
         overscroll-behavior: contain;
       }
       .sidebar.sheet-snap {
@@ -423,9 +442,8 @@
       .card-meta a { font-size: 12px; }
       .badge { font-size: 9px; padding: 4px 9px; }
 
-      /* Feed: more padding so last card isn't behind home indicator.
-         touch-action: pan-y lets the feed scroll natively even though
-         the parent .sidebar has touch-action: none for sheet dragging. */
+      /* Feed: extra padding keeps the last card clear of the home indicator.
+         Native vertical scrolling is preserved inside the bottom sheet. */
       .feed { padding: 8px 10px 24px; touch-action: pan-y; }
 
       /* Refresh bar */
@@ -676,6 +694,18 @@
     .badge-warning { background: rgba(245,158,11,0.12); color: #fde68a; border-color: rgba(245,158,11,0.25); }
     .badge-sighting { background: rgba(16,185,129,0.1); color: #a7f3d0; border-color: rgba(16,185,129,0.2); }
     .badge-unknown { background: rgba(59,130,246,0.1); color: #bfdbfe; border-color: rgba(59,130,246,0.2); }
+    .badge-flood { background: rgba(14,165,233,0.12); color: #bae6fd; border-color: rgba(14,165,233,0.3); }
+
+    .flood-note {
+      margin: 8px 10px 2px; padding: 9px 11px;
+      border: 1px solid rgba(14,165,233,0.22); border-radius: 10px;
+      background: rgba(14,165,233,0.07); color: #bae6fd;
+      font-size: 11px; line-height: 1.4;
+    }
+    .flood-severity { margin-top: 7px; color: #7dd3fc; font-size: 11px; font-weight: 600; }
+    .sidebar.flood-view .stats { grid-template-columns: 1fr; }
+    .sidebar.flood-view .stats .stat:not(.stat-total) { display: none; }
+    .sidebar.flood-view .time-range { display: none; }
 
     .health-dot {
       display: inline-flex; align-items: center; gap: 4px;
@@ -892,6 +922,7 @@
       .sidebar.sheet-full .species-section {
         max-height: 94px; padding: 2px 10px 4px;
       }
+      .sidebar.flood-view .species-section { display: none; }
       .species-header { margin-bottom: 3px; font-size: 9px; }
       .species-bar { gap: 4px; padding-bottom: 2px; }
       .species-item { min-width: 58px; padding: 3px 2px; border-radius: 10px; }
@@ -900,8 +931,8 @@
       .species-count { top: 0; right: 1px; min-width: 15px; height: 13px; font-size: 7px; }
       .time-range { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .time-pill { min-height: 38px; padding: 0 4px; font-size: 11px; }
-      .filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-      .filter-btn { min-height: 38px; padding: 0 3px; font-size: 10px; }
+      .filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      .filter-btn { min-height: 40px; padding: 0 2px; font-size: 10px; }
       .card-header { gap: 6px; }
       .badge { padding: 3px 6px; font-size: 7px; }
       .card-meta { flex-wrap: wrap; row-gap: 3px; }
@@ -916,7 +947,7 @@
       .surf-picker-toggle { max-width: 150px; }
       .stat-num { font-size: 17px; }
       .stat-label { font-size: 6px; }
-      .filter-btn { font-size: 9px; }
+      .filter-btn { font-size: 8px; }
     }
 
 
@@ -959,6 +990,7 @@
         </div>
         <div class="loading-text">Scanning for shark sightings<span class="loading-dots"></span></div>
       </div>
+      <div id="map-status" class="map-status" role="status" hidden>Map unavailable. Reports are still available in the list.</div>
 
       <div class="surf-picker" id="surf-picker">
         <button type="button" class="surf-picker-toggle" id="surf-picker-toggle" aria-expanded="false" aria-controls="surf-picker-panel">
@@ -1000,8 +1032,8 @@
       </div>
 
       <div class="time-range" id="time-range">
-        <button class="time-pill" data-range="all">All Time</button>
-        <button class="time-pill" data-range="today">Today</button>
+        <button class="time-pill" data-range="all">Past Year</button>
+        <button class="time-pill" data-range="today">24 Hours</button>
         <button class="time-pill" data-range="7d">7 Days</button>
         <button class="time-pill active" data-range="30d">30 Days</button>
       </div>
@@ -1011,11 +1043,13 @@
         <button class="filter-btn" data-filter="Attack">🔴 Attacks</button>
         <button class="filter-btn" data-filter="Warning">🟠 Warnings</button>
         <button class="filter-btn" data-filter="Sighting">🟢 Sightings</button>
+        <button class="filter-btn" data-filter="Flood" aria-label="Show flood reports">🌊 Floods</button>
       </div>
 
       <div class="feed" id="feed"></div>
 
       <div class="refresh-bar">
+        <div id="sightings-status" class="sightings-status" role="status" hidden></div>
         <div id="last-refreshed" style="text-align:center;font-size:10px;color:#475569;margin-bottom:5px;"></div>
         <button class="refresh-btn" id="refresh-btn" disabled>Scanning…</button>
         <button type="button" class="auto-focus-toggle" id="auto-focus-toggle" aria-pressed="true" title="Open the map near your nearest beach">📍 Auto-focus: on</button>
@@ -1033,9 +1067,7 @@
     <div class="drawer-header">
       <button type="button" class="drawer-back" id="drawer-back">Back to map</button>
       <div class="drawer-title" id="drawer-title">Sign in to Sharkbait</div>
-      <div class="drawer-subtitle" id="drawer-subtitle">
-        Save your favorite sightings and get notified when sharks are spotted near you.
-      </div>
+      <div class="drawer-subtitle" id="drawer-subtitle"></div>
     </div>
 
     <div class="drawer-tabs" id="drawer-tabs">
@@ -1048,7 +1080,7 @@
         <label for="su-username">Username</label>
         <input id="su-username" type="text" name="username" placeholder="finchaser" autocomplete="username" maxlength="32">
       </div>
-      <div class="drawer-field">
+      <div class="drawer-field" id="field-email">
         <label for="su-email">Email</label>
         <input id="su-email" type="email" name="email" placeholder="you@example.com" autocomplete="email" required>
       </div>
@@ -1087,15 +1119,23 @@
 
     // Build-time injection from NEXT_PUBLIC_MAPBOX_TOKEN via scripts/inject-env.js
     var TOKEN = "__MAPBOX_TOKEN__";
-    var TYPE_COLORS = { Attack: "#ef4444", Warning: "#f59e0b", Sighting: "#10b981", Unknown: "#3b82f6" };
+    var TYPE_COLORS = { Attack: "#ef4444", Warning: "#f59e0b", Sighting: "#10b981", Flood: "#0ea5e9", Unknown: "#3b82f6" };
 
     var allSightings = [];
+    var allFloodReports = [];
+    var floodSourceStatus = { nws: { available: false, count: 0 }, gdacs: { available: false, count: 0 } };
+    var floodUpdatedAt = null;
+    var floodLoading = false;
+    var floodLoadFailed = false;
     var currentFilter = "All";
     var currentSpecies = "All";
     var currentTimeRange = "30d";
     var selectedId = null;
     var activePopup = null;
     var mapLoaded = false;
+    var sightingsRequest = null;
+    var sightingsLocationQuery = null;
+    var sightingsLoadFailed = false;
 
     // ── Shark 3D images by species ──────────────
     var SHARK_IMAGES = {
@@ -1133,26 +1173,45 @@
     }
 
     // ── Map ──────────────────────────────────────
-    mapboxgl.accessToken = TOKEN;
-    var map = new mapboxgl.Map({
-      container: "map",
-      style: "mapbox://styles/mapbox/satellite-streets-v12",
-      center: [-128, 37],
-      zoom: 3.5,
-      projection: "globe"
-    });
-    map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-left");
+    var mapStatus = document.getElementById("map-status");
+    var map = null;
+    if (TOKEN.indexOf("pk.") === 0 && typeof mapboxgl !== "undefined") {
+      try {
+        mapboxgl.accessToken = TOKEN;
+        map = new mapboxgl.Map({
+          container: "map",
+          style: "mapbox://styles/mapbox/satellite-streets-v12",
+          center: [-128, 37],
+          zoom: 3.5,
+          projection: "globe"
+        });
+        map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-left");
+      } catch (error) {
+        if (map) map.remove();
+        map = null;
+      }
+    }
+    mapStatus.hidden = !!map;
+
+    function resizeMap() {
+      if (map) map.resize();
+    }
 
     // Logo click resets map view (keyboard-accessible button)
     var logoBtn = document.getElementById("logo-btn");
     if (logoBtn) {
       logoBtn.addEventListener("click", function() {
-        map.flyTo({ center: [-128, 37], zoom: 3.5, duration: 1500 });
+        if (mapLoaded) map.flyTo({ center: [-128, 37], zoom: 3.5, duration: 1500 });
       });
     }
 
-    map.on("load", function() {
+    if (map) map.on("error", function() {
+      if (!mapLoaded) mapStatus.hidden = false;
+    });
+
+    if (map) map.on("load", function() {
       mapLoaded = true;
+      mapStatus.hidden = true;
 
       map.setFog({
         color: "rgb(10, 20, 40)",
@@ -1163,6 +1222,11 @@
       });
 
       map.addSource("sightings", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] }
+      });
+
+      map.addSource("flood-reports", {
         type: "geojson",
         data: { type: "FeatureCollection", features: [] }
       });
@@ -1191,6 +1255,42 @@
         }
       });
 
+      map.addLayer({
+        id: "flood-area-fill",
+        type: "fill",
+        source: "flood-reports",
+        filter: ["any", ["==", ["geometry-type"], "Polygon"], ["==", ["geometry-type"], "MultiPolygon"]],
+        paint: {
+          "fill-color": ["match", ["get", "severity"], "Extreme", "#b91c1c", "Severe", "#dc2626", "Moderate", "#f97316", "Minor", "#0ea5e9", "Red", "#dc2626", "Orange", "#f97316", "#38bdf8"],
+          "fill-opacity": 0.16
+        }
+      });
+
+      map.addLayer({
+        id: "flood-area-outline",
+        type: "line",
+        source: "flood-reports",
+        filter: ["any", ["==", ["geometry-type"], "Polygon"], ["==", ["geometry-type"], "MultiPolygon"]],
+        paint: {
+          "line-color": ["match", ["get", "severity"], "Extreme", "#b91c1c", "Severe", "#dc2626", "Moderate", "#f97316", "Minor", "#0ea5e9", "Red", "#dc2626", "Orange", "#f97316", "#38bdf8"],
+          "line-width": 2,
+          "line-opacity": 0.9
+        }
+      });
+
+      map.addLayer({
+        id: "flood-points",
+        type: "circle",
+        source: "flood-reports",
+        filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-radius": ["interpolate", ["linear"], ["zoom"], 1, 6, 6, 10, 12, 15],
+          "circle-color": ["match", ["get", "severity"], "Extreme", "#b91c1c", "Severe", "#dc2626", "Moderate", "#f97316", "Minor", "#0ea5e9", "Red", "#dc2626", "Orange", "#f97316", "#38bdf8"],
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#ffffff"
+        }
+      });
+
       function openMapPopupFromFeature(f) {
         if (!f || !f.geometry || f.geometry.type !== "Point") return;
         var props = f.properties || {};
@@ -1213,9 +1313,36 @@
           .addTo(map);
       }
 
+      function openFloodPopupFromFeature(f, clickLocation) {
+        if (!f || !f.properties) return;
+        var props = f.properties;
+        var coords = f.geometry && f.geometry.type === "Point"
+          ? f.geometry.coordinates
+          : [clickLocation.lng, clickLocation.lat];
+        var title = String(props.title || "Flood report").substring(0, 140);
+        var location = String(props.location || "Location unavailable");
+        var severity = String(props.severity || "Current");
+        var source = String(props.source || "Flood source");
+        var description = String(props.description || "").substring(0, 420);
+        var url = props.url != null ? String(props.url) : "";
+        if (activePopup) { activePopup.remove(); activePopup = null; }
+        selectedId = props.id;
+        updateFeed();
+        activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "300px" })
+          .setLngLat(coords)
+          .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 5px;font-weight:700;font-size:13px;color:#1a1a2e;">' + escapeHtml(title) + '</p><p style="margin:0 0 5px;font-size:11px;color:#555;">' + escapeHtml(location) + ' · ' + escapeHtml(severity) + ' · ' + escapeHtml(source) + '</p>' + (description ? '<p style="margin:5px 0 7px;font-size:11px;color:#555;max-height:90px;overflow:auto;">' + escapeHtml(description) + '</p>' : '') + (url ? '<a href="' + safeUrl(url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0369a1;font-weight:600;text-decoration:none;">Open source report</a>' : '') + '</div>')
+          .addTo(map);
+      }
+
       map.on("click", function(e) {
-        var features = map.queryRenderedFeatures(e.point, { layers: ["sightings-dots", "sightings-glow"] });
+        var features = map.queryRenderedFeatures(e.point, { layers: ["flood-points", "flood-area-outline", "flood-area-fill", "sightings-dots", "sightings-glow"] });
         if (!features.length) return;
+        var floodFeature = features.find(function(feature) { return feature.properties && feature.properties.type === "Flood"; });
+        if (floodFeature) {
+          openFloodPopupFromFeature(floodFeature, e.lngLat);
+          window.dispatchEvent(new Event("sharkmap:select"));
+          return;
+        }
         var top = features[0];
         openMapPopupFromFeature(top);
         window.dispatchEvent(new Event("sharkmap:select"));
@@ -1225,8 +1352,12 @@
       map.on("mouseleave", "sightings-dots", function() { map.getCanvas().style.cursor = ""; });
       map.on("mouseenter", "sightings-glow", function() { map.getCanvas().style.cursor = "pointer"; });
       map.on("mouseleave", "sightings-glow", function() { map.getCanvas().style.cursor = ""; });
+      map.on("mouseenter", "flood-points", function() { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "flood-points", function() { map.getCanvas().style.cursor = ""; });
+      map.on("mouseenter", "flood-area-fill", function() { map.getCanvas().style.cursor = "pointer"; });
+      map.on("mouseleave", "flood-area-fill", function() { map.getCanvas().style.cursor = ""; });
 
-      if (allSightings.length > 0) render();
+      render();
 
       applyAutoCoastalFocus();
     });
@@ -1291,7 +1422,7 @@
       fetch("/api/geo")
         .then(function(r) { return r.ok ? r.json() : null; })
         .then(function(geo) {
-          if (!geo || !geo.available || activeLocation) return;
+          if (!geo || !geo.available || activeLocation || !isAutoFocusEnabled()) return;
           var anchor = nearestCoastalAnchor(geo.lat, geo.lon);
           if (!anchor) return;
           try { map.flyTo({ center: [anchor.lon, anchor.lat], zoom: anchor.zoom || 7, duration: 1800 }); }
@@ -1322,8 +1453,11 @@
     }
 
     function getFiltered() {
-      var s = allSightings;
       var cutoff = getTimeRangeCutoff();
+      if (currentFilter === "Flood") {
+        return allFloodReports;
+      }
+      var s = allSightings;
       if (cutoff > 0) {
         s = s.filter(function(x) { return new Date(x.date).getTime() >= cutoff; });
       }
@@ -1366,6 +1500,10 @@
     // ── Species Bar ─────────────────────────────
     function updateSpeciesBar() {
       var bar = document.getElementById("species-bar");
+      if (currentFilter === "Flood") {
+        bar.innerHTML = "";
+        return;
+      }
       var counts = {};
       var cutoff = getTimeRangeCutoff();
       var base = allSightings;
@@ -1417,7 +1555,8 @@
     // ── Map Data ────────────────────────────────
     function updateMapData() {
       if (!mapLoaded) return;
-      var sightings = getFiltered();
+      var floodView = currentFilter === "Flood";
+      var sightings = floodView ? [] : getFiltered();
       var features = sightings.map(function(s) {
         return {
           type: "Feature",
@@ -1435,47 +1574,103 @@
       });
       var src = map.getSource("sightings");
       if (src) src.setData({ type: "FeatureCollection", features: features });
+
+      var floods = floodView ? getFiltered() : [];
+      var floodFeatures = floods.filter(function(report) {
+        return report.geometry || (Number.isFinite(report.lat) && Number.isFinite(report.lon));
+      }).map(function(report) {
+        var geometry = report.geometry || { type: "Point", coordinates: [report.lon, report.lat] };
+        return {
+          type: "Feature",
+          geometry: geometry,
+          properties: {
+            id: report.id,
+            title: report.title,
+            location: report.location,
+            type: "Flood",
+            severity: report.severity,
+            source: report.source,
+            url: report.url || "",
+            description: report.description || ""
+          }
+        };
+      });
+      var floodSource = map.getSource("flood-reports");
+      if (floodSource) floodSource.setData({ type: "FeatureCollection", features: floodFeatures });
+      ["sightings-glow", "sightings-dots"].forEach(function(id) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", floodView ? "none" : "visible");
+      });
+      ["flood-area-fill", "flood-area-outline", "flood-points"].forEach(function(id) {
+        if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", floodView ? "visible" : "none");
+      });
     }
 
     // ── Feed ─────────────────────────────────────
     function updateFeed() {
       var feed = document.getElementById("feed");
       var sightings = getFiltered();
+      var floodView = currentFilter === "Flood";
+      var html = "";
+      if (floodView) {
+        if (floodLoading && sightings.length === 0) {
+          feed.innerHTML = '<div class="empty">Loading flood reports…</div>';
+          return;
+        }
+        var nws = floodSourceStatus.nws;
+        var gdacs = floodSourceStatus.gdacs;
+        var nwsText = nws.available ? "U.S. NWS " + nws.count : "U.S. NWS unavailable";
+        var gdacsText = gdacs.available ? "Global GDACS " + gdacs.count : "Global GDACS unavailable";
+        var updated = floodUpdatedAt ? " Updated " + timeAgo(floodUpdatedAt) + "." : "";
+        var stale = floodLoadFailed && sightings.length ? " Refresh failed. Showing previously loaded reports." : "";
+        html = '<div class="flood-note">' + escapeHtml(nwsText + " · " + gdacsText + ". NWS alerts are active. GDACS covers events from the last 30 days." + updated + stale) + " Shaded areas show alert coverage. Pins show approximate locations.</div>";
+        if (sightings.length === 0) {
+          var floodUnavailable = floodLoadFailed || (!nws.available && !gdacs.available);
+          var floodEmpty = floodUnavailable ? "Flood reports are unavailable right now. Tap refresh to try again." : "No flood reports available right now.";
+          feed.innerHTML = html + '<div class="empty">' + floodEmpty + '</div>';
+          return;
+        }
+      }
       if (sightings.length === 0) {
         var emptyMsg;
-        if (activeLocation) {
+        if (sightingsLoadFailed) {
+          emptyMsg = "Sightings are unavailable. Tap refresh to try again.";
+        } else if (sightingsRequest) {
+          emptyMsg = "Loading sightings…";
+        } else if (activeLocation) {
           emptyMsg = "No shark activity within " + activeLocation.radiusMiles + " mi of " + escapeHtml(activeLocation.name);
         } else {
-          var rangeLabels = { all: "", today: " today", "7d": " this week", "30d": " this month" };
+          var rangeLabels = { all: " in the past year", today: " in the past 24 hours", "7d": " in the past 7 days", "30d": " in the past 30 days" };
           emptyMsg = "No sightings found" + (rangeLabels[currentTimeRange] || "");
         }
         feed.innerHTML = '<div class="empty">' + emptyMsg + '</div>';
         return;
       }
-      var html = "";
       for (var i = 0; i < sightings.length; i++) {
         var s = sightings[i];
-        var badgeClass = "badge-" + s.type.toLowerCase();
+        var badgeClass = "badge-" + (floodView ? "flood" : s.type.toLowerCase());
         var activeClass = String(s.id) === String(selectedId) ? " active" : "";
-        var accent = TYPE_COLORS[s.type] || "#3b82f6";
+        var accent = TYPE_COLORS[floodView ? "Flood" : s.type] || "#3b82f6";
         var delay = Math.min(i * 0.04, 0.8);
 
-        html += '<div class="card' + activeClass + '" data-id="' + s.id + '" style="--card-accent:' + accent + ';animation-delay:' + delay + 's">';
+        html += '<div class="card' + activeClass + '" data-id="' + escapeHtml(s.id) + '" style="--card-accent:' + accent + ';animation-delay:' + delay + 's">';
         html += '<div class="card-header"><div class="card-title">' + escapeHtml(s.title) + '</div>';
         html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;flex-shrink:0;">';
-        html += '<span class="badge ' + badgeClass + '">' + escapeHtml(s.type) + '</span>';
-        html += healthBadge(s.confidence, s.healthScore);
+        html += '<span class="badge ' + badgeClass + '">' + (floodView ? "Flood" : escapeHtml(s.type)) + '</span>';
+        html += floodView ? '<span class="badge badge-flood">' + escapeHtml(s.severity || "Current") + '</span>' : healthBadge(s.confidence, s.healthScore);
         html += '</div></div>';
 
         if (s.species && s.species !== "Unknown") {
           html += '<div class="card-species">' + getSharkIcon(s.species) + ' ' + escapeHtml(s.species) + '</div>';
         }
 
+        if (floodView) html += '<div class="flood-severity">' + escapeHtml(s.source) + ' · ' + escapeHtml(s.severity || "Current") + '</div>';
+
         var distHtml = (typeof s.distanceMiles === "number")
           ? '<span class="card-distance">📏 ' + s.distanceMiles.toFixed(1) + ' mi away</span>'
           : '';
         html += '<div class="card-location">📍 ' + escapeHtml(s.location) + distHtml + '</div>';
-        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span><a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener">Read →</a></div>';
+        var articleLink = s.url ? '<a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener">Read →</a>' : '';
+        html += '<div class="card-meta"><span>' + timeAgo(s.date) + '</span><span>' + escapeHtml(s.source) + '</span>' + articleLink + '</div>';
         html += '</div>';
       }
       feed.innerHTML = html;
@@ -1483,16 +1678,34 @@
       feed.querySelectorAll(".card").forEach(function(card) {
         card.addEventListener("click", function(e) {
           if (e.target.tagName === "A") return;
-          selectSighting(this.getAttribute("data-id"));
+          if (currentFilter === "Flood") selectFloodReport(this.getAttribute("data-id"));
+          else selectSighting(this.getAttribute("data-id"));
         });
       });
     }
 
-    function selectSighting(id) {
+    function findFloodById(id) {
+      var sid = String(id);
+      return allFloodReports.find(function(report) { return String(report.id) === sid; });
+    }
+
+    function selectFloodReport(id) {
       if (activePopup) { activePopup.remove(); activePopup = null; }
       selectedId = selectedId != null && String(selectedId) === String(id) ? null : id;
       updateFeed();
-      if (selectedId) {
+      if (!selectedId || !mapLoaded) return;
+      var report = findFloodById(selectedId);
+      if (report && Number.isFinite(report.lat) && Number.isFinite(report.lon)) {
+        map.flyTo({ center: [report.lon, report.lat], zoom: report.geometry && report.geometry.type === "Point" ? 5 : 7, duration: 1000 });
+      }
+    }
+
+    function selectSighting(id) {
+      if (currentFilter === "Flood") { selectFloodReport(id); return; }
+      if (activePopup) { activePopup.remove(); activePopup = null; }
+      selectedId = selectedId != null && String(selectedId) === String(id) ? null : id;
+      updateFeed();
+      if (selectedId && mapLoaded) {
         var s = findSightingById(selectedId);
         if (s) {
           map.flyTo({ center: [s.lon, s.lat], zoom: 8, duration: 1200 });
@@ -1519,8 +1732,22 @@
       document.querySelectorAll(".filter-btn").forEach(function(b) { b.classList.remove("active"); });
       var match = document.querySelector('.filter-btn[data-filter="' + filter + '"]');
       if (match) match.classList.add("active");
+      if (currentFilter !== filter && activePopup) {
+        activePopup.remove();
+        activePopup = null;
+      }
+      if (currentFilter !== filter) selectedId = null;
       currentFilter = filter;
+      document.getElementById("sidebar").classList.toggle("flood-view", filter === "Flood");
+      var totalStat = document.querySelector(".stat-total");
+      totalStat.setAttribute("data-filter", filter === "Flood" ? "Flood" : "All");
+      totalStat.setAttribute("aria-label", filter === "Flood" ? "Show flood reports" : "Show all sightings");
+      totalStat.querySelector(".stat-icon").textContent = filter === "Flood" ? "🌊" : "🦈";
+      totalStat.querySelector(".stat-label").textContent = filter === "Flood" ? "Flood reports" : "Total";
       currentSpecies = "All";
+      if (filter === "Flood" && !floodUpdatedAt && !floodLoadFailed) fetchFloodReports();
+      updateRefreshButton();
+      updateLastRefreshed();
       render();
     }
 
@@ -1590,6 +1817,7 @@
     function geocodeViaMapbox(query) {
       var q = (query || "").trim();
       if (!q) return Promise.resolve(null);
+      if (TOKEN.indexOf("pk.") !== 0) return Promise.reject(new Error("Place search is unavailable"));
       var key = q.toLowerCase();
       if (geocodeCache[key]) return Promise.resolve(geocodeCache[key]);
       var url = MAPBOX_GEOCODE_URL + encodeURIComponent(q) + ".json?limit=1&access_token=" + TOKEN;
@@ -1608,6 +1836,7 @@
     }
 
     function placeSearchMarker(lat, lon) {
+      if (!map) return;
       if (searchedLocationMarker) searchedLocationMarker.remove();
       var el = document.createElement("div");
       el.style.cssText = "width:18px;height:18px;border-radius:50%;background:#5eead4;border:3px solid rgba(2,6,23,0.95);box-shadow:0 0 0 2px rgba(94,234,212,0.45),0 4px 12px rgba(0,0,0,0.4);";
@@ -1684,7 +1913,7 @@
       input.addEventListener("focus", openMenu);
       input.addEventListener("input", openMenu);
 
-      menu.addEventListener("mousedown", function(e) {
+      menu.addEventListener("click", function(e) {
         var btn = e.target.closest(".surf-picker-option");
         if (!btn) return;
         e.preventDefault();
@@ -1693,7 +1922,7 @@
         if (spot) selectSurfSpot(spot);
       });
 
-      document.addEventListener("mousedown", function(e) {
+      document.addEventListener("pointerdown", function(e) {
         if (!picker.contains(e.target)) setExpanded(false);
       });
       input.addEventListener("keydown", function(e) {
@@ -1822,65 +2051,131 @@
 
     // ── Fetch ────────────────────────────────────
     function fetchSightings(silent) {
-      var btn = document.getElementById("refresh-btn");
-      btn.disabled = true;
-      if (!silent) {
-        btn.textContent = "Scanning…";
+      if (silent && sightingsRequest) return;
+      if (sightingsRequest) sightingsRequest.abort();
+      var request = new AbortController();
+      sightingsRequest = request;
+      var timer = setTimeout(function() { request.abort(); }, 20000);
+      var status = document.getElementById("sightings-status");
+      updateRefreshButton();
+      if (!silent && currentFilter !== "Flood") {
         document.getElementById("loading").classList.remove("hidden");
       }
 
       var requestedDays = currentTimeRange === "all" ? 365 : 30;
-      var qs = "t=" + Date.now() + "&days=" + requestedDays;
+      var locationQuery = "";
       var loc = activeLocation;
       if (loc) {
         if (loc.kind === "spot" && loc.slug) {
-          qs += "&spot=" + encodeURIComponent(loc.slug) + "&radius=" + encodeURIComponent(loc.radiusMiles);
+          locationQuery = "&spot=" + encodeURIComponent(loc.slug);
         } else {
-          qs += "&lat=" + encodeURIComponent(loc.lat) + "&lon=" + encodeURIComponent(loc.lon) + "&radius=" + encodeURIComponent(loc.radiusMiles);
+          locationQuery = "&lat=" + encodeURIComponent(loc.lat) + "&lon=" + encodeURIComponent(loc.lon);
         }
+        locationQuery += "&radius=" + encodeURIComponent(loc.radiusMiles);
+      }
+      if (locationQuery !== sightingsLocationQuery) {
+        sightingsLocationQuery = locationQuery;
+        allSightings = [];
+        lastFetchedAt = null;
+        sightingsLoadFailed = false;
+        status.hidden = true;
+        updateNearbyBanner(null);
+        if (currentFilter !== "Flood") render();
       }
 
-      fetch("/api/sightings?" + qs)
+      fetch("/api/sightings?days=" + requestedDays + locationQuery, { signal: request.signal })
         .then(function(r) {
           if (!r.ok) throw new Error("Server returned " + r.status);
           return r.json();
         })
         .then(function(data) {
-          var rows = Array.isArray(data) ? data : (data.sightings || []);
-          if (data.fetchedAt) lastFetchedAt = data.fetchedAt;
+          if (sightingsRequest !== request) return;
+          var rows = Array.isArray(data) ? data : data.sightings;
+          if (!Array.isArray(rows)) throw new Error("Invalid sightings response");
+          lastFetchedAt = data.fetchedAt || new Date().toISOString();
           allSightings = rows;
-          render();
-          updateLastRefreshed();
+          sightingsLoadFailed = false;
           updateNearbyBanner(loc || null);
         })
         .catch(function(err) {
+          if (sightingsRequest !== request) return;
           if (window.__SHARKBAIT_DEBUG__) console.error("Fetch failed:", err);
-          if (!silent) {
-            var feed = document.getElementById("feed");
-            if (feed) feed.innerHTML = '<div class="empty">Failed to load sightings. Tap refresh to try again.</div>';
-          }
+          sightingsLoadFailed = true;
         })
         .finally(function() {
-          btn.disabled = false;
-          btn.textContent = "🔄 Refresh sightings";
-          if (!silent) document.getElementById("loading").classList.add("hidden");
+          clearTimeout(timer);
+          if (sightingsRequest !== request) return;
+          sightingsRequest = null;
+          status.textContent = "Refresh failed. Showing previously loaded sightings.";
+          status.hidden = !sightingsLoadFailed || !allSightings.length;
+          document.getElementById("loading").classList.add("hidden");
+          updateRefreshButton();
+          updateLastRefreshed();
+          if (currentFilter !== "Flood") render();
+        });
+    }
+
+    function updateRefreshButton() {
+      var btn = document.getElementById("refresh-btn");
+      btn.disabled = currentFilter === "Flood" ? floodLoading : !!sightingsRequest;
+      btn.textContent = btn.disabled ? "Loading reports…" : "🔄 Refresh reports";
+    }
+
+    function fetchFloodReports() {
+      if (floodLoading) return;
+      floodLoading = true;
+      var request = new AbortController();
+      var timer = setTimeout(function() { request.abort(); }, 12000);
+      updateRefreshButton();
+      if (currentFilter === "Flood") updateFeed();
+      fetch("/api/floods", { signal: request.signal })
+        .then(function(r) {
+          if (!r.ok) throw new Error("Server returned " + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (!Array.isArray(data.reports) || !data.sources || !data.sources.nws || !data.sources.gdacs) {
+            throw new Error("Invalid flood response");
+          }
+          allFloodReports = data.reports;
+          floodSourceStatus = data.sources;
+          floodUpdatedAt = data.updatedAt || new Date().toISOString();
+          floodLoadFailed = false;
+        })
+        .catch(function(err) {
+          if (window.__SHARKBAIT_DEBUG__) console.error("Flood report fetch failed:", err);
+          floodLoadFailed = true;
+        })
+        .finally(function() {
+          clearTimeout(timer);
+          floodLoading = false;
+          updateRefreshButton();
+          updateLastRefreshed();
+          if (currentFilter === "Flood") render();
         });
     }
 
     function updateLastRefreshed() {
       var el = document.getElementById("last-refreshed");
       if (!el) return;
-      if (!lastFetchedAt) { el.textContent = ""; return; }
-      var mins = Math.floor((Date.now() - new Date(lastFetchedAt).getTime()) / 60000);
+      var updatedAt = currentFilter === "Flood" ? floodUpdatedAt : lastFetchedAt;
+      if (!updatedAt) { el.textContent = ""; return; }
+      var mins = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 60000);
       el.textContent = mins < 1 ? "Updated just now" : "Updated " + mins + "m ago";
     }
 
     // Auto-refresh every 5 minutes
-    setInterval(function() { fetchSightings(true); updateLastRefreshed(); }, 5 * 60 * 1000);
+    setInterval(function() {
+      if (currentFilter === "Flood") fetchFloodReports();
+      else fetchSightings(true);
+    }, 5 * 60 * 1000);
     // Tick the "updated Xm ago" label every minute
     setInterval(updateLastRefreshed, 60 * 1000);
 
-    document.getElementById("refresh-btn").addEventListener("click", function() { fetchSightings(false); });
+    document.getElementById("refresh-btn").addEventListener("click", function() {
+      if (currentFilter === "Flood") fetchFloodReports();
+      else fetchSightings(false);
+    });
 
     // ── Desktop: resizable sidebar ──────────────
     (function() {
@@ -1899,16 +2194,16 @@
         if (!dragging) return;
         var w = Math.max(260, Math.min(window.innerWidth - e.clientX, window.innerWidth * 0.65));
         sidebar.style.width = w + "px";
-        map.resize();
+        resizeMap();
       }
       function onEnd() {
         dragging = false; handle.classList.remove("active");
         document.body.classList.remove("resizing");
         document.removeEventListener("mousemove", onMove);
         document.removeEventListener("mouseup", onEnd);
-        map.resize();
+        resizeMap();
       }
-      window.addEventListener("resize", function() { map.resize(); });
+      window.addEventListener("resize", resizeMap);
     })();
 
     // ── Mobile: bottom sheet ─────────────────────
@@ -1960,7 +2255,7 @@
       });
 
       // Expose for surf-spot picker so a selection can pop the sheet to half
-      window.__snapBottomSheet = function(s) { snapTo(s, true); map.resize(); };
+      window.__snapBottomSheet = function(s) { snapTo(s, true); resizeMap(); };
 
       // Drag logic — works on both handle AND the feed (when at top of scroll)
       function startDrag(clientY) {
@@ -2015,7 +2310,7 @@
           next = dists[0].s;
         }
         snapTo(next, true);
-        map.resize();
+        resizeMap();
       }
 
       // Touch on the sheet handle
@@ -2049,23 +2344,23 @@
       handle.addEventListener("click", function() {
         var next = state === "peek" ? "half" : state === "half" ? "full" : "peek";
         snapTo(next, true);
-        map.resize();
+        resizeMap();
       });
 
       // When a map pin is tapped: pull sheet to half so map is visible
       window.addEventListener("sharkmap:select", function() {
-        if (state === "full") { snapTo("half", true); map.resize(); }
+        if (state === "full") { snapTo("half", true); resizeMap(); }
       });
 
       // Expand to half when a card is tapped from peek
       sidebar.addEventListener("click", function(e) {
         var card = e.target.closest(".card");
-        if (card && state === "peek") { snapTo("half", true); map.resize(); }
+        if (card && state === "peek") { snapTo("half", true); resizeMap(); }
       });
 
       window.addEventListener("resize", function() {
         snapTo(state, false);
-        map.resize();
+        resizeMap();
       });
     })();
 
@@ -2077,12 +2372,7 @@
       var SUPABASE_URL = "https://ixknullykihbxjlcmvog.supabase.co";
       var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aChhjIWW-XBzfK0F8UBmTA_81E6P76Q";
 
-      // Defensive — should always be defined here, but guard anyway
-      if (typeof supabase === "undefined" || !supabase.createClient) {
-        if (window.__SHARKBAIT_DEBUG__) console.warn("[auth] Supabase JS not loaded; auth disabled");
-        return;
-      }
-      var sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      var sb = typeof supabase !== "undefined" && supabase.createClient && supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       });
 
@@ -2093,7 +2383,9 @@
       var form        = document.getElementById("auth-form");
       var submit      = document.getElementById("auth-submit");
       var tabs        = document.querySelectorAll(".drawer-tab");
+      var tabList     = document.getElementById("drawer-tabs");
       var fieldUser   = document.getElementById("field-username");
+      var fieldEmail  = document.getElementById("field-email");
       var inputUser   = document.getElementById("su-username");
       var inputEmail  = document.getElementById("su-email");
       var inputPwd    = document.getElementById("su-password");
@@ -2130,16 +2422,30 @@
 
       function setMode(next) {
         mode = next;
+        form.style.display = "";
+        accountBox.hidden = true;
+        tabList.hidden = next === "recovery";
+        fieldEmail.hidden = next === "recovery";
+        inputEmail.required = next !== "recovery";
+        inputEmail.disabled = next === "recovery";
         tabs.forEach(function(t) {
           t.classList.toggle("active", t.getAttribute("data-mode") === next);
         });
         if (next === "signup") {
           titleEl.textContent = "Create your account";
-          subtitleEl.textContent = "Save favorite sightings and get notified when sharks show up near you.";
+          subtitleEl.textContent = "Choose a username and confirm your email to sign in.";
           fieldUser.hidden = false;
           inputUser.required = true;
           inputPwd.setAttribute("autocomplete", "new-password");
           submit.textContent = "Create account";
+          forgotLink.style.display = "none";
+        } else if (next === "recovery") {
+          titleEl.textContent = "Reset your password";
+          subtitleEl.textContent = "Enter a new password with at least 8 characters.";
+          fieldUser.hidden = true;
+          inputUser.required = false;
+          inputPwd.setAttribute("autocomplete", "new-password");
+          submit.textContent = "Update password";
           forgotLink.style.display = "none";
         } else {
           titleEl.textContent = "Sign in to Sharkbait";
@@ -2155,19 +2461,18 @@
       function renderSession(session) {
         if (session && session.user) {
           var u = session.user;
-          var uname = (u.user_metadata && u.user_metadata.username) || u.email.split("@")[0];
+          var uname = (u.user_metadata && u.user_metadata.username) || (u.email || "").split("@")[0];
           accountName.textContent = uname;
-          accountMail.textContent = u.email;
+          accountMail.textContent = u.email || "";
           accountBox.hidden = false;
           form.style.display = "none";
-          document.getElementById("drawer-tabs").style.display = "none";
+          tabList.hidden = true;
           titleEl.textContent = "Your account";
           subtitleEl.textContent = "You're signed in.";
         } else {
           accountBox.hidden = true;
           form.style.display = "";
-          document.getElementById("drawer-tabs").style.display = "";
-          setMode(mode); // restore title/subtitle for current mode
+          setMode(mode === "recovery" ? "signin" : mode);
         }
       }
 
@@ -2186,6 +2491,14 @@
         if (e.key === "Escape" && drawer.classList.contains("open")) closeDrawer();
       });
 
+      if (!sb) {
+        titleEl.textContent = "Sign-in is temporarily unavailable";
+        subtitleEl.textContent = "You can still browse reports without an account.";
+        tabList.hidden = true;
+        form.hidden = true;
+        return;
+      }
+
       // Form submit (sign in OR sign up)
       form.addEventListener("submit", async function(e) {
         e.preventDefault();
@@ -2193,15 +2506,23 @@
         var email    = inputEmail.value.trim();
         var password = inputPwd.value;
 
-        if (!/^\S+@\S+\.\S+$/.test(email)) { showToast("Enter a valid email"); return; }
+        if (mode !== "recovery" && !/^\S+@\S+\.\S+$/.test(email)) { showToast("Enter a valid email"); return; }
         if (password.length < 8) { showToast("Password must be 8+ characters"); return; }
         if (mode === "signup" && username.length < 2) { showToast("Pick a username (2+ chars)"); return; }
 
         submit.disabled = true;
-        submit.textContent = mode === "signup" ? "Creating…" : "Signing in…";
+        var action = submit.textContent;
+        submit.textContent = "Working…";
 
         try {
-          if (mode === "signup") {
+          if (mode === "recovery") {
+            var changed = await sb.auth.updateUser({ password: password });
+            if (changed.error) throw changed.error;
+            form.reset();
+            mode = "signin";
+            renderSession(changed.data.user ? { user: changed.data.user } : null);
+            showToast("Password updated.");
+          } else if (mode === "signup") {
             var resUp = await sb.auth.signUp({
               email: email,
               password: password,
@@ -2224,7 +2545,7 @@
           showToast(err && err.message ? err.message : "Something went wrong");
         } finally {
           submit.disabled = false;
-          submit.textContent = mode === "signup" ? "Create account" : "Sign in";
+          if (submit.textContent === "Working…") submit.textContent = action;
         }
       });
 
@@ -2249,7 +2570,8 @@
       // Sign out
       signoutBtn.addEventListener("click", async function() {
         try {
-          await sb.auth.signOut();
+          var result = await sb.auth.signOut();
+          if (result.error) throw result.error;
           showToast("Signed out");
         } catch (err) {
           showToast("Sign out failed");
@@ -2257,13 +2579,18 @@
       });
 
       // React to auth state changes (sign in, sign out, token refresh)
-      sb.auth.onAuthStateChange(function(_event, session) {
-        renderSession(session);
+      sb.auth.onAuthStateChange(function(event, session) {
+        if (event === "PASSWORD_RECOVERY" && session) {
+          setMode("recovery");
+          openDrawer();
+        } else if (mode !== "recovery" || !session) {
+          renderSession(session);
+        }
       });
 
       // Hydrate initial state
       sb.auth.getSession().then(function(res) {
-        renderSession(res.data && res.data.session);
+        if (mode !== "recovery") renderSession(res.data && res.data.session);
       });
       setMode("signin");
     });

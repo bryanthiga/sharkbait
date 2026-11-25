@@ -1,56 +1,37 @@
-# Sharkbait Starter Kit
+# Sharkbait
 
-Drop these files into your Sharkbait project folder on your other computer.
+Sharkbait is a map and report feed for shark sightings, attacks, and active flood alerts.
 
-## What's Included
+## Run locally
 
-```
-scripts/
-  setup.sh          → First-time setup (run once)
-  dev.sh            → Start the dev server
-  save.sh           → Quick commit + push to GitHub
-  push-github.sh    → Create GitHub repo + first push
-  new-feature.sh    → Start a new feature branch
-
-.cursor/rules/
-  sharkbait.mdc     → Tells Cursor how to help you with Sharkbait
-
-CLAUDE.md           → Tells Claude Code about the project
+```bash
+npm ci
+cp .env.example .env.local
+# Set NEXT_PUBLIC_MAPBOX_TOKEN in .env.local
+npm run dev
 ```
 
-## How To Use
+Set a public Mapbox token to enable the map and freeform location search. The report lists and built-in surf spot search also work without it. The flood feed uses public NWS and GDACS data.
 
-1. **Copy everything** from this folder into your Sharkbait project root
-2. Open the project in Cursor
-3. In the terminal, run:
-   ```
-   bash scripts/setup.sh
-   ```
-4. To start the app:
-   ```
-   bash scripts/dev.sh
-   ```
-5. To push to GitHub for the first time:
-   ```
-   bash scripts/push-github.sh
-   ```
-6. After that, whenever you want to save your work:
-   ```
-   bash scripts/save.sh
-   ```
+## Main components
 
-## Talking To Cursor
+- `public/index.template.html` is the map-first interface. `npm run dev` and `npm run build` generate the ignored `public/index.html` from this template.
+- `app/api/sightings/route.ts` and `lib/scanner.ts` aggregate shark reports.
+- `app/api/floods/route.ts` and `lib/floods.ts` serve active U.S. National Weather Service alerts and current global GDACS flood events.
+- `app/api/surf-spots/route.ts` serves the surf location picker.
+- `TEST/` contains the Vitest suite.
 
-With the `.cursor/rules/sharkbait.mdc` file in place, Cursor will understand:
-- What Sharkbait is
-- That you're non-technical
-- To just make changes instead of explaining code
-- UI preferences (dark ocean theme, map-first, mobile-friendly)
-- What data sources to pull from
+## Commands
 
-Just talk to it like you normally would. Say things like:
-- "make the map bigger"
-- "add more shark data sources"
-- "the sightings aren't loading, fix it"
-- "make the mobile view better"
-- "push my changes"
+```bash
+npm run dev
+npm test
+npm run lint
+npm run build
+```
+
+## Data notes
+
+- Shark report availability depends on third-party feeds and the configured credentials in `.env.local`. The old OCEARCH, Shark Research Committee, and Dorsal endpoints no longer return usable machine-readable data. For tagged sharks, use the [official OCEARCH tracker](https://www.ocearch.org/research/track-sharks-with-us/).
+- Complete flood responses are cached for five minutes. NWS supplies active U.S. alerts, and GDACS supplies recent events worldwide. NWS polygons show alert areas, and GDACS pins show approximate locations.
+- External text is escaped before it is inserted into HTML, and external links pass through `safeUrl()`.

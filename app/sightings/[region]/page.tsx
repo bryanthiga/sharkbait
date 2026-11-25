@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getCachedSightings, applyFilters } from "@/lib/sightings-store";
-import { REGIONS, getRegionBySlug, inRegion } from "@/lib/regions";
+import { getCachedSightings, applyFilters, type SightingWithDistance } from "@/lib/sightings-store";
+import { getRegionBySlug, inRegion } from "@/lib/regions";
 
 interface Props {
   params: Promise<{ region: string }>;
@@ -10,7 +10,7 @@ interface Props {
 export const revalidate = 300;
 
 export function generateStaticParams() {
-  return REGIONS.map((r) => ({ region: r.slug }));
+  return []; // Generate regional pages on first request so builds can run offline.
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -35,10 +35,14 @@ export default async function RegionPage({ params }: Props) {
   const r = getRegionBySlug(region);
   if (!r) notFound();
 
-  const { sightings: all } = await getCachedSightings();
-  const filtered = applyFilters(all, { days: 30, limit: 200 }).filter((s) =>
-    inRegion(s, r),
-  );
+  let filtered: SightingWithDistance[] | null;
+  try {
+    const { sightings: all } = await getCachedSightings();
+    filtered = applyFilters(all.filter((s) => inRegion(s, r)), { days: 30, limit: 200 });
+  } catch (error) {
+    console.error("[sightings/region] Scan failed:", error);
+    filtered = null;
+  }
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-10">
@@ -49,11 +53,10 @@ export default async function RegionPage({ params }: Props) {
         Shark sightings in {r.name}
       </h1>
       <p className="mt-2 text-slate-400">
-        {filtered.length} sighting{filtered.length === 1 ? "" : "s"} in the last
-        30 days.
+        {filtered ? `${filtered.length} sighting${filtered.length === 1 ? "" : "s"} in the last 30 days.` : "Sightings are temporarily unavailable."}
       </p>
       <ul className="mt-8 space-y-3">
-        {filtered.map((s) => (
+        {filtered?.map((s) => (
           <li
             key={s.id}
             className="rounded-lg border border-ocean-800/60 bg-ocean-900/40 p-4"
@@ -83,7 +86,7 @@ export default async function RegionPage({ params }: Props) {
             </div>
           </li>
         ))}
-        {filtered.length === 0 && (
+        {filtered?.length === 0 && (
           <li className="text-slate-500">
             No sightings reported in the last 30 days.
           </li>
