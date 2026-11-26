@@ -756,7 +756,7 @@ async function fetchNitter(): Promise<RawArticle[]> {
 async function fetchINaturalist(): Promise<RawArticleWithCoords[] | null> {
   try {
     const params = new URLSearchParams({
-      taxon_id: "47273", // Sharks (Selachimorpha)
+      taxon_id: "551307", // iNaturalist's Selachii (sharks), excluding rays and skates
       quality_grade: "research",
       per_page: "100",
       order_by: "observed_on",

@@ -1318,7 +1318,7 @@
           : '';
         activePopup = new mapboxgl.Popup({ offset: 12, closeButton: true, maxWidth: "280px" })
           .setLngLat(coords)
-          .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(title) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(location) + ' &middot; ' + escapeHtml(typ) + ' &middot; ' + escapeHtml(source) + '</p><a href="' + safeUrl(url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
+          .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(title) + '</p>' + speciesHtml + '<p style="margin:4px 0 8px;font-size:11px;color:#555;">' + escapeHtml(location) + ' &middot; ' + escapeHtml(typ) + ' &middot; ' + escapeHtml(source) + '<br>Location may be approximate.</p><a href="' + safeUrl(url) + '" target="_blank" rel="noopener" style="font-size:12px;color:#0d9488;font-weight:600;text-decoration:none;">Read article →</a></div>')
           .addTo(map);
       }
 
@@ -1631,7 +1631,7 @@
         var gdacsText = gdacs.available ? "Global GDACS " + gdacs.count : "Global GDACS unavailable";
         var updated = floodUpdatedAt ? " Updated " + timeAgo(floodUpdatedAt) + "." : "";
         var stale = floodLoadFailed && sightings.length ? " Refresh failed. Showing previously loaded reports." : "";
-        html = '<div class="flood-note">' + escapeHtml(nwsText + " · " + gdacsText + ". NWS alerts are active. GDACS covers events from the last 30 days." + updated + stale) + " Shaded areas show alert coverage. Pins show approximate locations.</div>";
+        html = '<div class="flood-note">' + escapeHtml(nwsText + " · " + gdacsText + ". NWS alerts are active. GDACS covers events from the last 30 days." + updated + stale) + " Shaded areas show available alert coverage. Some alerts appear only in the list. Pins show approximate locations.</div>";
         if (sightings.length === 0) {
           var floodUnavailable = floodLoadFailed || (!nws.available && !gdacs.available);
           var floodEmpty = floodUnavailable ? "Flood reports are unavailable right now. Tap refresh to try again." : "No flood reports available right now.";
@@ -1654,6 +1654,9 @@
         feed.innerHTML = '<div class="empty">' + emptyMsg + '</div>';
         return;
       }
+      if (!floodView) {
+        html = '<div class="flood-note">Locations may be approximate. News dates show when an article was published; check the source for when the sighting happened.</div>';
+      }
       for (var i = 0; i < sightings.length; i++) {
         var s = sightings[i];
         var badgeClass = "badge-" + (floodView ? "flood" : s.type.toLowerCase());
@@ -1675,7 +1678,7 @@
         if (floodView) html += '<div class="flood-severity">' + escapeHtml(s.source) + ' · ' + escapeHtml(s.severity || "Current") + '</div>';
 
         var distHtml = (typeof s.distanceMiles === "number")
-          ? '<span class="card-distance">📏 ' + s.distanceMiles.toFixed(1) + ' mi away</span>'
+          ? '<span class="card-distance">📏 About ' + s.distanceMiles.toFixed(1) + ' mi away</span>'
           : '';
         html += '<div class="card-location">📍 ' + escapeHtml(s.location) + distHtml + '</div>';
         var articleLink = s.url ? '<a href="' + safeUrl(s.url) + '" target="_blank" rel="noopener">Read →</a>' : '';
@@ -1723,7 +1726,7 @@
             : '';
           activePopup = new mapboxgl.Popup({ offset: 12, closeButton: false, maxWidth: "260px" })
             .setLngLat([s.lon, s.lat])
-            .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + '</p></div>')
+            .setHTML('<div style="font-family:system-ui;padding:4px 0;"><p style="margin:0 0 4px;font-weight:600;font-size:13px;color:#1a1a2e;">' + escapeHtml(s.title.substring(0, 80)) + '</p>' + speciesHtml + '<p style="margin:4px 0;font-size:11px;color:#555;">' + escapeHtml(s.location) + ' &middot; ' + escapeHtml(s.type) + '<br>Location may be approximate.</p></div>')
             .addTo(map);
         }
       }

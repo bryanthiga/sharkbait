@@ -399,6 +399,8 @@ describe("scanForSightings", () => {
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await scanForSightings();
+    const inatRequest = mockFetch.mock.calls.find(([url]: [string]) => url.includes("inaturalist.org"));
+    expect(new URL(inatRequest[0]).searchParams.get("taxon_id")).toBe("551307");
     expect(result.length).toBeGreaterThan(0);
     const s = result[0];
     expect(s).toHaveProperty("id");
